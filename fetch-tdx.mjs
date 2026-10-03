@@ -34,7 +34,12 @@ function parseMile(s) {
 function trimCctv(json) {
   const KEEP = ["CCTVID", "RoadID", "RoadName", "RoadDirection", "LocationMile", "VideoImageURL", "SurveillanceDescription"];
   const list = (json.CCTVs || [])
-    .filter((c) => String(c.RoadID) === "300090" && inRange(parseMile(c.LocationMile)))
+    .filter((c) => {
+      // 台9線本身，或 ID 屬於台9線里程樁的花蓮市區道路（康樂路、中正路一段）；排除台9丁/甲/乙/丙等支線
+      const isRoute9 = String(c.RoadID) === "300090";
+      const isCityRoad = /^CCTV-\d+-0090-/.test(String(c.CCTVID || "")) && !/^台9/.test(String(c.RoadName || ""));
+      return (isRoute9 || isCityRoad) && inRange(parseMile(c.LocationMile));
+    })
     .map((c) => Object.fromEntries(KEEP.map((k) => [k, c[k]])));
   return { UpdateTime: json.UpdateTime, CCTVs: list };
 }
@@ -106,14 +111,6 @@ if (!tokenRes.ok) {
       }
 
       const trimmer = TRIMMERS[name];
-      if (name === "cctv") {
-  status.rawCctv = (json.CCTVs || []).length;
-  status.cctvDropped = (json.CCTVs || [])
-    .filter((c) => /台9|0090/.test(String(c.RoadName) + String(c.RoadID) + String(c.CCTVID)))
-    .filter((c) => { const km = parseMile(c.LocationMile); return isNaN(km) || (km >= 140 && km <= 320); })
-    .filter((c) => !(String(c.RoadID) === "300090" && inRange(parseMile(c.LocationMile))))
-    .map((c) => [c.CCTVID, c.RoadID, c.RoadName, c.LocationMile]);
-}
       const trimmed = trimmer.fn(json);
       const n = trimmer.count(trimmed);
       status.kept[name] = n;
