@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>花蓮哨兵 — 台9線花蓮全縣即時路況｜車速偵測、CCTV快照、管制通報</title>
-  <meta name="description" content="花蓮哨兵提供花蓮全縣台9線（崇德至富里）即時車速、各路口監視器影像快照、路段施工管制與即時通報。花蓮公路旅行與返鄉必備決策儀表板。" />
+  <meta name="description" content="花蓮哨兵提供花蓮全縣台9線（和平至富里）即時車速、各路口監視器影像快照、路段施工管制與即時通報。花蓮公路旅行與返鄉必備決策儀表板。" />
   <meta name="keywords" content="花蓮路況,台9線即時影像,花蓮CCTV,花蓮即時車速,崇德路況,玉里路況,吉安路況,花蓮道路救援" />
 
   <meta property="og:type" content="website" />
@@ -17,13 +17,14 @@
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
 
   <style>
-    body { background-color: #0b0f17; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #0b0f17; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif; }
     .glass-card { background: rgba(22, 27, 34, 0.8); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.08); }
     .pulse-dot { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @media (prefers-reduced-motion: reduce) { .pulse-dot { animation: none; } }
   </style>
 </head>
 <body class="min-h-screen pb-16">
@@ -43,6 +44,42 @@
   <script>
     const { createApp, ref, computed, onMounted } = Vue;
 
+    // ===== 花蓮縣台9線：和平 145K → 縣界橋 304.737K（約 160 公里）=====
+    const TOTAL_KM = 160;
+
+    // 南下順序（北 → 南）。km 為 VD / CCTV 里程區間
+    const SEGMENTS = [
+      { key: 'north', name: '崇德・新城・花蓮市', km: [145, 192], limit: 60 },
+      { key: 'jian',  name: '吉安・壽豐',         km: [192, 217], limit: 60 },
+      { key: 'mid',   name: '鳳林・光復',         km: [217, 246], limit: 70 },
+      { key: 'south', name: '瑞穗・玉里・富里',   km: [246, 305], limit: 70 }
+    ];
+
+    // CCTV 分區：a 崇德・新城・花蓮市 / b 吉安・壽豐 / c 鳳林・光復 / d 瑞穗・玉里・富里
+    const sectionOf = (km) => km < 192 ? 'a' : km < 217 ? 'b' : km < 246 ? 'c' : 'd';
+
+    // 地標（里程為路標里程，與 TDX 里程可能差約 1K，故標題用「近○○」）
+    const PLACES = [
+      [145,'和平'],[149,'中仁隧道'],[158,'大清水'],[162,'崇德'],[168,'太魯閣大橋北'],
+      [174,'三棧'],[183,'北埔'],[187,'新城花蓮市界'],[190,'花蓮市中山路'],[192.5,'吉安南埔'],
+      [198,'木瓜溪橋'],[203.5,'志學'],[206,'壽豐'],[214,'溪口'],[217,'新豐平大橋'],
+      [224,'鳳林'],[229,'長橋'],[232.4,'馬太鞍溪橋'],[235.4,'光復'],[243,'大和'],
+      [246.3,'富源'],[255.3,'瑞穗'],[264.2,'舞鶴'],[266.1,'三民'],[272.4,'大禹'],
+      [277.2,'玉里'],[282.85,'安通'],[287.45,'東里'],[301.2,'富里'],[304.7,'縣界橋']
+    ];
+    const nearPlace = (km) =>
+      PLACES.reduce((best, p) => Math.abs(p[0] - km) < Math.abs(best[0] - km) ? p : best)[1];
+
+    // "166K+230" -> 166.23
+    const parseMile = (s) => {
+      const m = String(s || '').match(/(\d+)\s*K\s*\+?\s*(\d*)/i);
+      return m ? parseInt(m[1], 10) + (m[2] ? parseInt(m[2], 10) / 1000 : 0) : NaN;
+    };
+
+    const PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="225"><rect width="100%" height="100%" fill="#111827"/>' +
+      '<text x="50%" y="50%" fill="#64748b" font-size="16" font-family="sans-serif" text-anchor="middle">影像暫時無法載入</text></svg>');
+
     createApp({
       setup() {
         const direction = ref('south');
@@ -54,236 +91,158 @@
         const newsRawData = ref([]);
         const cctvRawData = ref([]);
 
-        // 花蓮縱谷台9線四大分區核心監測段
-        const segmentsConfig = {
-          south: [
-            { key: 'north', name: '崇德 ⇄ 新城・花蓮市', mileage: '台9線 166K-198K', limit: 60, vdPatterns: ['166', '172', '175', '190', '198'] },
-            { key: 'jian',  name: '吉安 ⇄ 壽豐 (木瓜溪橋)', mileage: '台9線 201K-222K', limit: 60, vdPatterns: ['201', '206', '212', '222'] },
-            { key: 'mid',   name: '鳳林 ⇄ 光復 (馬太鞍)', mileage: '台9線 226K-255K', limit: 70, vdPatterns: ['230', '240', '248', '252'] },
-            { key: 'south', name: '瑞穗 ⇄ 玉里・富里', mileage: '台9線 260K-319K', limit: 70, vdPatterns: ['262', '277', '282', '293', '300', '315'] }
-          ],
-          north: [
-            { key: 'south', name: '富里・玉里 ⇄ 瑞穗', mileage: '台9線 319K-260K', limit: 70, vdPatterns: ['315', '300', '293', '282', '277', '262'] },
-            { key: 'mid',   name: '光復 (馬太鞍) ⇄ 鳳林', mileage: '台9線 255K-226K', limit: 70, vdPatterns: ['252', '248', '240', '230'] },
-            { key: 'jian',  name: '壽豐 (木瓜溪橋) ⇄ 吉安', mileage: '台9線 222K-201K', limit: 60, vdPatterns: ['222', '212', '206', '201'] },
-            { key: 'north', name: '花蓮市・新城 ⇄ 崇德', mileage: '台9線 198K-166K', limit: 60, vdPatterns: ['198', '190', '175', '172', '166'] }
-          ]
-        };
-
-        // 花蓮縣台9線精選 CCTV 監視器 (a: 北區, b: 吉安壽豐, c: 中區鳳林光復, d: 南區玉里富里)
-        const camTargetsRaw = {
-          south: [
-            ['CCTV-42-0090-166-002', '166K+230', 'a', '崇德管制端'],
-            ['CCTV-43-0090-173-001', '173K+930', 'a', '新城太魯閣大橋'],
-            ['CCTV-43-0090-177-001', '177K+895', 'a', '新城三棧'],
-            ['CCTV-43-0090-190-001', '190K+000', 'a', '花蓮市北端'],
-            ['CCTV-43-0090-198-001', '198K+470', 'a', '花蓮市中正路端'],
-
-            ['CCTV-43-0090-201-001', '201K+000', 'b', '吉安外環道交會'],
-            ['CCTV-43-0090-206-001', '206K+564', 'b', '吉安稻香段'],
-            ['CCTV-43-0090-212-001', '212K+178', 'b', '木瓜溪大橋北端'],
-            ['CCTV-43-0090-222-001', '222K+183', 'b', '壽豐豐田段'],
-
-            ['CCTV-43-0090-230-001', '230K+049', 'c', '鳳林長橋段'],
-            ['CCTV-46-0090-262-001', '262K+198', 'c', '光復大平段'],
-
-            ['CCTV-46-0090-277-001', '277K+734', 'd', '瑞穗舞鶴台地'],
-            ['CCTV-46-0090-282-001', '282K+236', 'd', '三民大橋段'],
-            ['CCTV-46-0090-293-001', '293K+276', 'd', '玉里外環道'],
-            ['CCTV-46-0090-300-001', '300K+074', 'd', '玉里南興段'],
-            ['CCTV-36-0090-313-002', '313K+000', 'd', '富里竹田路段']
-          ],
-          north: [
-            ['CCTV-36-0090-313-002', '313K+000', 'd', '富里往玉里'],
-            ['CCTV-46-0090-300-001', '300K+074', 'd', '玉里外環道北上'],
-            ['CCTV-46-0090-293-001', '293K+276', 'd', '玉里榮民醫院端'],
-            ['CCTV-46-0090-282-001', '282K+236', 'd', '三民段北上'],
-            ['CCTV-46-0090-277-001', '277K+734', 'd', '瑞穗舞鶴坡道'],
-
-            ['CCTV-46-0090-262-001', '262K+198', 'c', '光復馬太鞍橋端'],
-            ['CCTV-43-0090-230-001', '230K+049', 'c', '鳳林林榮段'],
-
-            ['CCTV-43-0090-222-001', '222K+183', 'b', '壽豐溪橋端'],
-            ['CCTV-43-0090-212-001', '212K+178', 'b', '木瓜溪大橋南端'],
-            ['CCTV-43-0090-206-001', '206K+564', 'b', '吉安干城段'],
-            ['CCTV-43-0090-201-001', '201K+000', 'b', '吉安南華段'],
-
-            ['CCTV-43-0090-198-001', '198K+470', 'a', '花蓮市邊界'],
-            ['CCTV-43-0090-190-001', '190K+000', 'a', '北埔嘉里段'],
-            ['CCTV-43-0090-177-002', '177K+895', 'a', '新城三棧北上'],
-            ['CCTV-43-0090-175-003', '175K+980', 'a', '太魯閣大橋端'],
-            ['CCTV-42-0090-166-002', '166K+230', 'a', '崇德管制站北上']
-          ]
-        };
-
-        const camTargets = {
-          south: camTargetsRaw.south.map(([id, mile, sec, name]) => ({ id, mile, sec, name })),
-          north: camTargetsRaw.north.map(([id, mile, sec, name]) => ({ id, mile, sec, name }))
+        const getJson = async (name, t) => {
+          const res = await fetch(`./data/${name}.json?t=${t}`);
+          return res.ok ? res.json() : null;
         };
 
         const loadData = async () => {
+          const t = Date.now();
           try {
-            const timestamp = Date.now();
-            const vdRes = await fetch(`./data/vd.json?t=${timestamp}`);
-            if (vdRes.ok) {
-              const vdJson = await vdRes.json();
-              vdRawData.value = vdJson.VDLives || [];
-              if (vdJson.UpdateTime) {
-                const date = new Date(vdJson.UpdateTime);
-                updateTimeDisplay.value = date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+            const vd = await getJson('vd', t);
+            if (vd) {
+              vdRawData.value = vd.VDLives || [];
+              if (vd.UpdateTime) {
+                updateTimeDisplay.value = new Date(vd.UpdateTime)
+                  .toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
               }
             }
-
-            const newsRes = await fetch(`./data/news.json?t=${timestamp}`);
-            if (newsRes.ok) {
-              const newsJson = await newsRes.json();
-              newsRawData.value = newsJson.Newses || [];
-            }
-
-            const cctvRes = await fetch(`./data/cctv.json?t=${timestamp}`);
-            if (cctvRes.ok) {
-              const cctvJson = await cctvRes.json();
-              cctvRawData.value = cctvJson.CCTVs || [];
-            }
-          } catch (e) {
-            console.error('路況資料同步失敗:', e);
-          }
+          } catch (e) { console.error('VD 載入失敗:', e); }
+          try {
+            const news = await getJson('news', t);
+            if (news) newsRawData.value = news.Newses || [];
+          } catch (e) { console.error('新聞載入失敗:', e); }
+          try {
+            const cctv = await getJson('cctv', t);
+            if (cctv) cctvRawData.value = cctv.CCTVs || [];
+          } catch (e) { console.error('CCTV 載入失敗:', e); }
         };
 
+        // ---- 各區間車速（分方向；沒車的偵測器不計入，不再用假數字）----
         const currentSegments = computed(() => {
-          const list = segmentsConfig[direction.value];
+          // LinkID 第 8 碼：0 = 順樁(南下)、1 = 逆樁(北上)。若發現方向相反，把 '0' 與 '1' 對調即可。
+          const flag = direction.value === 'south' ? '0' : '1';
+          const list = direction.value === 'south' ? SEGMENTS : [...SEGMENTS].reverse();
+
           return list.map(seg => {
-            const matchedVDs = vdRawData.value.filter(item => {
-              if (!item.VDID || !item.VDID.includes('0090')) return false;
-              return seg.vdPatterns.some(pat => item.VDID.includes(`-${pat}-`));
-            });
-
-            let speeds = [];
-            matchedVDs.forEach(vd => {
-              if (vd.LinkFlows) {
-                vd.LinkFlows.forEach(link => {
-                  if (link.Lanes) {
-                    link.Lanes.forEach(lane => {
-                      if (lane.Speed > 0 && lane.Speed < 140) speeds.push(lane.Speed);
-                    });
-                  }
+            const [lo, hi] = seg.km;
+            const speeds = [];
+            vdRawData.value.forEach(vd => {
+              const m = String(vd.VDID || '').match(/-0090-(\d{3})-/);
+              if (!m) return;
+              const km = parseInt(m[1], 10);
+              if (km < lo || km >= hi) return;
+              (vd.LinkFlows || []).forEach(link => {
+                if (String(link.LinkID || '').charAt(7) !== flag) return;
+                (link.Lanes || []).forEach(lane => {
+                  if (lane.Speed > 0 && lane.Speed < 140) speeds.push(lane.Speed);
                 });
-              }
+              });
             });
-
-            const avgSpeed = speeds.length > 0
-              ? Math.round(speeds.reduce((a, b) => a + b, 0) / speeds.length)
-              : 58;
-
-            return { ...seg, speed: avgSpeed };
+            const hasData = speeds.length > 0;
+            const mileage = direction.value === 'south'
+              ? `台9線 ${lo}K-${Math.round(hi)}K`
+              : `台9線 ${Math.round(hi)}K-${lo}K`;
+            return {
+              ...seg, mileage, hasData,
+              speed: hasData ? Math.round(speeds.reduce((a, b) => a + b, 0) / speeds.length) : 0
+            };
           });
         });
 
         const overallAvgSpeed = computed(() => {
-          const list = currentSegments.value;
-          const sum = list.reduce((a, b) => a + b.speed, 0);
-          return Math.round(sum / list.length);
+          const ok = currentSegments.value.filter(s => s.hasData);
+          return ok.length ? Math.round(ok.reduce((a, b) => a + b.speed, 0) / ok.length) : 0;
         });
 
-        // 崇德至富里全長約 120 公里
-        const totalEstimatedMinutes = computed(() => {
-          return Math.round((120 / overallAvgSpeed.value) * 60);
-        });
+        const totalEstimatedMinutes = computed(() =>
+          overallAvgSpeed.value ? Math.round((TOTAL_KM / overallAvgSpeed.value) * 60) : '--');
 
         const decision = computed(() => {
           const spd = overallAvgSpeed.value;
+          if (!spd) {
+            return {
+              title: '目前車流稀少',
+              desc: '偵測器這一分鐘幾乎沒有車輛通過，無法估算車速，可參考下方監視器影像。'
+            };
+          }
           if (spd >= 52) {
             return {
               title: '花蓮縱谷全線暢通',
-              desc: '台9線崇德至富里車流流暢，市區外環道與各主要大橋均維持正常車速。'
+              desc: '台9線和平至富里車流流暢，市區外環道與各主要大橋均維持正常車速。'
             };
-          } else if (spd >= 38) {
+          }
+          if (spd >= 38) {
             return {
               title: '部分路段車多放緩',
               desc: '花蓮市區外環、吉安路口或進行道路刨鋪路段車速較緩，請保持行車安全距離。'
             };
-          } else {
-            return {
-              title: '主要幹道回堵壅塞',
-              desc: '連假出遊或施工管制點出現車多排隊，請留意號誌指示並耐心駕駛。'
-            };
           }
+          return {
+            title: '主要幹道回堵壅塞',
+            desc: '連假出遊或施工管制點出現車多排隊，請留意號誌指示並耐心駕駛。'
+          };
         });
 
-        const filteredNews = computed(() => {
-          return newsRawData.value.filter(n => {
-            const text = (n.Title || '') + (n.Description || '');
-            return !text.includes('國5路況專區');
-          }).slice(0, 4);
-        });
+        const filteredNews = computed(() =>
+          newsRawData.value
+            .filter(n => !((n.Title || '') + (n.Description || '')).includes('國5路況專區'))
+            .sort((a, b) => new Date(b.PublishTime) - new Date(a.PublishTime))
+            .slice(0, 6));
 
-        const cctvList = computed(() => {
-          const dirCode = direction.value === 'south' ? 'S' : 'N';
-          const dirText = direction.value === 'south' ? '南下' : '北上';
-          let list = [];
-
-          camTargets[direction.value].forEach(t => {
-            if (activeSection.value !== 'all' && t.sec !== activeSection.value) return;
-
-            const found = cctvRawData.value.find(c => c.CCTVID === t.id)
-              || cctvRawData.value.find(c =>
-                   c.RoadID === '300090' &&
-                   c.RoadDirection === dirCode &&
-                   c.LocationMile && String(c.LocationMile).replace(/\s/g, '') === t.mile);
-
-            if (found && found.VideoImageURL) {
-              const url = found.VideoImageURL;
-              list.push({
-                id: found.CCTVID,
-                sec: t.sec,
-                title: t.name || `${t.mile} ${dirText}`,
-                desc: found.SurveillanceDescription || `${dirText}方向`,
-                mileage: found.LocationMile || t.mile,
-                snapshotUrl: url + (url.includes('?') ? '&' : '?') + 't=' + tick.value
-              });
-            }
-          });
-
-          if (!showAllCCTV.value && activeSection.value === 'all' && list.length > 4) {
-            return list.slice(0, 4);
+        // ---- CCTV：直接顯示資料裡所有花蓮段監視器，依里程排序、同點同向去重 ----
+        const cctvFiltered = computed(() => {
+          const seen = new Set();
+          const rows = [];
+          for (const c of cctvRawData.value) {
+            const km = parseMile(c.LocationMile);
+            if (!c.VideoImageURL || isNaN(km)) continue;
+            if (activeSection.value !== 'all' && sectionOf(km) !== activeSection.value) continue;
+            const key = c.LocationMile + '|' + c.RoadDirection;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const url = c.VideoImageURL;
+            const d = c.SurveillanceDescription || '';
+            rows.push({
+              id: c.CCTVID,
+              km,
+              title: '近' + nearPlace(km) + '・' + c.LocationMile,
+              desc: /^台9線\s*\d/.test(d) ? (c.RoadDirection === 'N' ? '北向鏡頭' : '南向鏡頭') : d,
+              mileage: c.LocationMile,
+              snapshotUrl: url + (url.includes('?') ? '&' : '?') + 't=' + tick.value
+            });
           }
-          return list;
+          rows.sort((a, b) => direction.value === 'south' ? a.km - b.km : b.km - a.km);
+          return rows;
         });
 
-        const totalCctvCount = computed(() => {
-          const dirCode = direction.value === 'south' ? 'S' : 'N';
-          let count = 0;
-          camTargets[direction.value].forEach(t => {
-            if (activeSection.value !== 'all' && t.sec !== activeSection.value) return;
-            const found = cctvRawData.value.find(c => c.CCTVID === t.id)
-              || cctvRawData.value.find(c =>
-                   c.RoadID === '300090' && c.RoadDirection === dirCode && c.LocationMile && String(c.LocationMile).replace(/\s/g, '') === t.mile);
-            if (found && found.VideoImageURL) count++;
-          });
-          return count;
-        });
+        const PREVIEW = 8;
+        const cctvList = computed(() =>
+          (!showAllCCTV.value && activeSection.value === 'all')
+            ? cctvFiltered.value.slice(0, PREVIEW)
+            : cctvFiltered.value);
+        const totalCctvCount = computed(() => cctvFiltered.value.length);
+        const previewCount = PREVIEW;
 
         const getStatusBadge = (spd) => {
           if (spd >= 52) return 'bg-emerald-500/20 text-emerald-400';
           if (spd >= 35) return 'bg-amber-500/20 text-amber-400';
           return 'bg-rose-500/20 text-rose-400';
         };
-
-        const getStatusText = (spd) => {
-          if (spd >= 52) return '順暢';
-          if (spd >= 35) return '車多';
-          return '壅塞';
-        };
-
+        const getStatusText = (spd) => spd >= 52 ? '順暢' : spd >= 35 ? '車多' : '壅塞';
         const getSpeedColor = (spd) => {
           if (spd >= 52) return 'text-emerald-400';
           if (spd >= 35) return 'text-amber-400';
           return 'text-rose-400';
         };
+        const barColor = (spd) => spd >= 52 ? 'bg-emerald-500' : spd >= 35 ? 'bg-amber-500' : 'bg-rose-500';
 
         const handleImgError = (e) => {
-          e.target.src = 'https://placehold.co/400x225/111827/64748b?text=CCTV+Connecting...';
+          e.target.onerror = null;
+          e.target.src = PLACEHOLDER;
         };
+
+        const setDirection = (d) => { direction.value = d; showAllCCTV.value = false; };
 
         onMounted(() => {
           loadData();
@@ -292,21 +251,11 @@
         });
 
         return {
-          direction,
-          activeSection,
-          showAllCCTV,
-          updateTimeDisplay,
-          currentSegments,
-          overallAvgSpeed,
-          totalEstimatedMinutes,
-          decision,
-          filteredNews,
-          cctvList,
-          totalCctvCount,
-          getStatusBadge,
-          getStatusText,
-          getSpeedColor,
-          handleImgError
+          direction, activeSection, showAllCCTV, updateTimeDisplay,
+          currentSegments, overallAvgSpeed, totalEstimatedMinutes, decision,
+          filteredNews, cctvList, totalCctvCount, previewCount,
+          getStatusBadge, getStatusText, getSpeedColor, barColor,
+          handleImgError, setDirection
         };
       },
       template: `
@@ -326,17 +275,17 @@
                 <div class="text-xs font-mono text-emerald-400">{{ updateTimeDisplay }}</div>
               </div>
               <div class="bg-slate-800/90 p-1 rounded-xl flex text-xs font-medium border border-slate-700/50">
-                <button 
-                  @click="direction = 'south'; showAllCCTV = false;" 
+                <button
+                  @click="setDirection('south')"
                   :class="direction === 'south' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'"
                   class="px-3 py-1.5 rounded-lg transition-all">
-                  南下 崇德往富里
+                  南下 往富里
                 </button>
-                <button 
-                  @click="direction = 'north'" 
+                <button
+                  @click="setDirection('north')"
                   :class="direction === 'north' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'"
                   class="px-3 py-1.5 rounded-lg transition-all">
-                  北上 富里往崇德
+                  北上 往崇德
                 </button>
               </div>
             </div>
@@ -354,13 +303,13 @@
 
               <div class="flex gap-4 items-center bg-slate-900/80 p-4 rounded-xl border border-slate-800 shrink-0">
                 <div>
-                  <div class="text-xs text-slate-400">崇德 ⇄ 富里 總程</div>
+                  <div class="text-xs text-slate-400">和平 ⇄ 縣界 總程</div>
                   <div class="text-2xl font-bold font-mono text-emerald-400">{{ totalEstimatedMinutes }} <span class="text-xs text-slate-400">分</span></div>
                 </div>
                 <div class="w-px h-8 bg-slate-800"></div>
                 <div>
                   <div class="text-xs text-slate-400">全線均速</div>
-                  <div class="text-2xl font-bold font-mono text-white">{{ overallAvgSpeed }} <span class="text-xs text-slate-400">km/h</span></div>
+                  <div class="text-2xl font-bold font-mono text-white">{{ overallAvgSpeed || '--' }} <span class="text-xs text-slate-400">km/h</span></div>
                 </div>
               </div>
             </div>
@@ -379,7 +328,7 @@
           <!-- 花蓮四大分區即時車速 -->
           <section class="mt-8">
             <div class="flex justify-between items-center mb-3">
-              <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">台9線花蓮各幹道區間車速</h3>
+              <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">台9線花蓮各幹道區間車速・{{ direction === 'south' ? '南下' : '北上' }}</h3>
               <span class="text-[11px] text-slate-500">單位：km/h</span>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -389,23 +338,24 @@
                     <span class="text-[11px] font-mono text-indigo-400">{{ seg.mileage }}</span>
                     <h4 class="font-bold text-sm text-white mt-0.5">{{ seg.name }}</h4>
                   </div>
-                  <span :class="getStatusBadge(seg.speed)" class="text-[11px] px-2 py-0.5 rounded font-medium">
+                  <span v-if="!seg.hasData" class="text-[11px] px-2 py-0.5 rounded font-medium bg-slate-500/20 text-slate-400">車少</span>
+                  <span v-else :class="getStatusBadge(seg.speed)" class="text-[11px] px-2 py-0.5 rounded font-medium">
                     {{ getStatusText(seg.speed) }}
                   </span>
                 </div>
 
                 <div class="flex items-baseline gap-2 mt-2">
-                  <span class="text-2xl font-extrabold font-mono" :class="getSpeedColor(seg.speed)">
-                    {{ seg.speed > 0 ? seg.speed : '--' }}
+                  <span class="text-2xl font-extrabold font-mono" :class="seg.hasData ? getSpeedColor(seg.speed) : 'text-slate-500'">
+                    {{ seg.hasData ? seg.speed : '--' }}
                   </span>
                   <span class="text-xs text-slate-400">km/h (速限 {{ seg.limit }})</span>
                 </div>
 
                 <div class="w-full bg-slate-800/80 h-1.5 rounded-full mt-3 overflow-hidden">
-                  <div 
+                  <div
                     class="h-full rounded-full transition-all"
-                    :class="seg.speed >= 52 ? 'bg-emerald-500' : (seg.speed >= 35 ? 'bg-amber-500' : 'bg-rose-500')"
-                    :style="{ width: Math.min(100, (seg.speed / seg.limit) * 100) + '%' }">
+                    :class="barColor(seg.speed)"
+                    :style="{ width: seg.hasData ? Math.min(100, (seg.speed / seg.limit) * 100) + '%' : '0%' }">
                   </div>
                 </div>
               </div>
@@ -417,12 +367,12 @@
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
               <div>
                 <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  全縣關鍵點位 CCTV 快照・{{ direction === 'south' ? '南下' : '北上' }}
+                  全縣 CCTV 快照・{{ direction === 'south' ? '由北往南' : '由南往北' }}
                 </h3>
               </div>
               <div class="flex flex-wrap gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs">
                 <button @click="activeSection = 'all'" :class="activeSection === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'" class="px-2.5 py-1 rounded-lg transition">全縣</button>
-                <button @click="activeSection = 'a'" :class="activeSection === 'a' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'" class="px-2.5 py-1 rounded-lg transition">花蓮北區</button>
+                <button @click="activeSection = 'a'" :class="activeSection === 'a' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'" class="px-2.5 py-1 rounded-lg transition">崇德・花蓮市</button>
                 <button @click="activeSection = 'b'" :class="activeSection === 'b' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'" class="px-2.5 py-1 rounded-lg transition">吉安・壽豐</button>
                 <button @click="activeSection = 'c'" :class="activeSection === 'c' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'" class="px-2.5 py-1 rounded-lg transition">鳳林・光復</button>
                 <button @click="activeSection = 'd'" :class="activeSection === 'd' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'" class="px-2.5 py-1 rounded-lg transition">瑞穗・玉里・富里</button>
@@ -432,8 +382,8 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               <div v-for="cam in cctvList" :key="cam.id" class="glass-card rounded-xl overflow-hidden group">
                 <div class="relative bg-slate-900 aspect-video flex items-center justify-center overflow-hidden">
-                  <img 
-                    :src="cam.snapshotUrl" 
+                  <img
+                    :src="cam.snapshotUrl"
                     :alt="cam.title"
                     loading="lazy"
                     class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -450,12 +400,16 @@
               </div>
             </div>
 
-            <div v-if="!showAllCCTV && activeSection === 'all' && totalCctvCount > 4" class="mt-4 text-center">
+            <div v-if="cctvList.length === 0" class="text-center text-xs text-slate-500 py-8">
+              此分區目前沒有可用的監視器資料
+            </div>
+
+            <div v-if="!showAllCCTV && activeSection === 'all' && totalCctvCount > previewCount" class="mt-4 text-center">
               <button @click="showAllCCTV = true" class="px-5 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 transition">
                 展開花蓮全縣所有 {{ totalCctvCount }} 個監視點 ▼
               </button>
             </div>
-            <div v-if="showAllCCTV && activeSection === 'all' && totalCctvCount > 4" class="mt-4 text-center">
+            <div v-if="showAllCCTV && activeSection === 'all' && totalCctvCount > previewCount" class="mt-4 text-center">
               <button @click="showAllCCTV = false" class="px-5 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 transition">
                 收合監視點 ▲
               </button>
@@ -465,7 +419,7 @@
           <footer class="mt-12 pt-6 border-t border-slate-800 text-xs text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-4">
             <p>花蓮即時路況監測・公路局 TDX 開放資料介接</p>
             <div class="flex gap-4">
-              <a href="https://168.thb.gov.tw/" target="_blank" class="hover:text-slate-300 underline">公路局 168 即時路況</a>
+              <a href="https://168.thb.gov.tw/" target="_blank" rel="noopener" class="hover:text-slate-300 underline">公路局 168 即時路況</a>
             </div>
           </footer>
         </div>
