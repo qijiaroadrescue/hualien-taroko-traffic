@@ -106,6 +106,14 @@ if (!tokenRes.ok) {
       }
 
       const trimmer = TRIMMERS[name];
+      if (name === "cctv") {
+  status.rawCctv = (json.CCTVs || []).length;
+  status.cctvDropped = (json.CCTVs || [])
+    .filter((c) => /台9|0090/.test(String(c.RoadName) + String(c.RoadID) + String(c.CCTVID)))
+    .filter((c) => { const km = parseMile(c.LocationMile); return isNaN(km) || (km >= 140 && km <= 320); })
+    .filter((c) => !(String(c.RoadID) === "300090" && inRange(parseMile(c.LocationMile))))
+    .map((c) => [c.CCTVID, c.RoadID, c.RoadName, c.LocationMile]);
+}
       const trimmed = trimmer.fn(json);
       const n = trimmer.count(trimmed);
       status.kept[name] = n;
