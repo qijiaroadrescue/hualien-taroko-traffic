@@ -207,13 +207,30 @@
               id: c.CCTVID,
               km,
               title: '近' + nearPlace(km) + '・' + c.LocationMile,
-              desc: /^台9線\s*\d/.test(d) ? (c.RoadDirection === 'N' ? '北向鏡頭' : '南向鏡頭') : d,
+              desc: (c.RoadName && c.RoadName !== '台9線' ? c.RoadName + '・' : '') +
+                    (/^台9線\s*\d/.test(d) || !d ? (c.RoadDirection === 'N' ? '北向鏡頭' : '南向鏡頭') : d),
               mileage: c.LocationMile,
               snapshotUrl: url + (url.includes('?') ? '&' : '?') + 't=' + tick.value
             });
           }
           rows.sort((a, b) => direction.value === 'south' ? a.km - b.km : b.km - a.km);
           return rows;
+        });
+
+        // 公開資料中沒有監視器的路段（相鄰兩支相距 10 公里以上）
+        const cctvGaps = computed(() => {
+          const kms = [...new Set(cctvRawData.value.map(c => parseMile(c.LocationMile)).filter(k => !isNaN(k)))]
+            .sort((a, b) => a - b);
+          if (!kms.length) return [];
+          const pts = [145, ...kms, 304.7];
+          const out = [];
+          for (let i = 1; i < pts.length; i++) {
+            const from = pts[i - 1], to = pts[i];
+            if (to - from < 10) continue;
+            if (activeSection.value !== 'all' && sectionOf(from) !== activeSection.value && sectionOf(to) !== activeSection.value) continue;
+            out.push(`${Math.round(from)}K–${Math.round(to)}K（約 ${Math.round(to - from)} 公里，${nearPlace(from)} 至 ${nearPlace(to)}）`);
+          }
+          return out;
         });
 
         const PREVIEW = 8;
@@ -253,7 +270,7 @@
         return {
           direction, activeSection, showAllCCTV, updateTimeDisplay,
           currentSegments, overallAvgSpeed, totalEstimatedMinutes, decision,
-          filteredNews, cctvList, totalCctvCount, previewCount,
+          filteredNews, cctvList, totalCctvCount, previewCount, cctvGaps,
           getStatusBadge, getStatusText, getSpeedColor, barColor,
           handleImgError, setDirection
         };
@@ -403,6 +420,10 @@
             <div v-if="cctvList.length === 0" class="text-center text-xs text-slate-500 py-8">
               此分區目前沒有可用的監視器資料
             </div>
+
+            <p v-if="cctvGaps.length" class="mt-3 text-[11px] text-slate-500 leading-relaxed">
+              公開資料中沒有監視器的路段：{{ cctvGaps.join('；') }}
+            </p>
 
             <div v-if="!showAllCCTV && activeSection === 'all' && totalCctvCount > previewCount" class="mt-4 text-center">
               <button @click="showAllCCTV = true" class="px-5 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 transition">
