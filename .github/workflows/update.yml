@@ -8,17 +8,22 @@ on:
 permissions:
   contents: write
 
+# 避免兩次執行同時 push 造成衝突
+concurrency:
+  group: update-traffic-data
+  cancel-in-progress: false
+
 jobs:
   fetch:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Fetch TDX Data
         env:
@@ -26,9 +31,17 @@ jobs:
           TDX_SECRET: ${{ secrets.TDX_SECRET }}
         run: node fetch-tdx.mjs
 
+      # 即使上一步失敗也要提交，這樣 data/status.json 能看到失敗原因
       - name: Commit and push changes
+        if: always()
         run: |
           git config --global user.name "TrafficBot"
           git config --global user.email "bot@traffic.local"
           git add data/
-          git diff --quiet && git diff --staged --quiet || (git commit -m "update data" && git push)
+          if git diff --staged --quiet; then
+            echo "no changes"
+          else
+            git commit -m "update data"
+            git pull --rebase -X theirs
+            git push
+          fi
