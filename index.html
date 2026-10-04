@@ -65,11 +65,6 @@ h2{font-size:1.1rem;margin:28px 0 12px}
 .legal h5{margin:0 0 4px;font-size:.85rem;color:var(--tx)}
 .legal p{margin:0 0 14px}
 .wrap{padding-bottom:150px}
-.mapbox{margin-top:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.mapbox .frame{position:relative;width:100%;aspect-ratio:4/3;background:#111827}
-.mapbox iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
-.mapbox .cap{padding:8px 12px;font-size:.78rem;color:var(--mut);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.mapbox .cap a{color:var(--blue);text-decoration:none}
 .chip{white-space:nowrap}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:14px;z-index:9}
 .box{background:var(--card);border-radius:16px;max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:16px}
@@ -110,7 +105,6 @@ const LINE = 'https://line.me/R/ti/p/%400937_165037';
 createApp({
   setup() {
     const dir = ref('south'), f = ref('all'), q = ref(''), zone = ref(null), theme = ref('dark');
-    const gmT = ref(Date.now()), navKey = ref(null);
     const vd = ref([]), news = ref([]), cctv = ref([]), upd = ref(''), tick = ref(Date.now()), modal = ref(null);
 
     const get = async n => { const r = await fetch(`./data/${n}.json?t=${Date.now()}`); return r.ok ? r.json() : null; };
@@ -178,11 +172,9 @@ createApp({
     };
     const imgErr = e => { e.target.onerror = null; e.target.src = PH; };
 
-    const gmSrc = s => 'https://maps.google.com/maps?ll=' + s.lat + ',' + s.lng + '&z=12&layer=t&hl=zh-TW&output=embed&_=' + gmT.value;
     const gmOpen = s => 'https://www.google.com/maps/@' + s.lat + ',' + s.lng + ',12z/data=!5m1!1e1';
-    const navSeg = computed(() => segs.value.find(x => x.k === navKey.value) || null);
-    onMounted(() => { load(); setInterval(load, 30000); setInterval(() => { gmT.value = Date.now(); }, 600000); });
-    return { dir, f, q, zone, theme, upd, modal, segs, zones, counts, shown, newsList, stText, SITE, TEL, LINE, gmSrc, gmOpen, navKey, navSeg,
+    onMounted(() => { load(); setInterval(load, 30000); });
+    return { dir, f, q, zone, theme, upd, modal, segs, zones, counts, shown, newsList, stText, SITE, TEL, LINE, gmOpen,
       setF, pickZone, toggleTheme, openCam, imgErr };
   },
   template: `
@@ -222,6 +214,8 @@ createApp({
       <button class="chip" @click="toggleTheme" aria-label="切換深淺色">{{ theme==='dark' ? '🌙' : '☀️' }}</button>
     </div>
 
+    <div v-if="f!=='ctl'" class="sub" style="margin:-4px 0 12px">🗺️ 點「導航」會開啟 Google 地圖並顯示路況線（綠＝順暢、橘＝車多、紅＝壅塞），可與 TDX 車速對照</div>
+
     <template v-if="f==='ctl'">
       <h2 style="margin-top:0">⚠️ 花蓮全縣路段管制／施工即時通報</h2>
       <div v-for="n in newsList" :key="n.NewsID" class="news"><h4>{{ n.Title }}</h4><p>{{ n.Description }}</p></div>
@@ -240,7 +234,7 @@ createApp({
         <ul><li v-for="t in s.tips" :key="t">{{ t }}</li></ul>
         <div class="btns">
           <button @click="openCam(s)">📹 即時影像</button>
-          <button @click="navKey=s.k">🗺️ 導航</button>
+          <a :href="gmOpen(s)" target="_blank" rel="noopener">🗺️ 導航</a>
         </div>
       </div>
       <div v-if="!shown.length" class="empty">沒有符合條件的路段</div>
@@ -275,21 +269,6 @@ createApp({
         <svg viewBox="0 0 24 24"><path d="M6.6 10.8a15 15 0 006.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 013 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2z"/></svg>
         0937-165-037
       </a>
-    </div>
-
-    <div v-if="navSeg" class="modal" @click.self="navKey=null">
-      <div class="box">
-        <div class="row"><h3 style="margin:0 0 10px">{{ navSeg.from }} → {{ navSeg.to }} 路況與導航</h3><button class="chip" @click="navKey=null">關閉</button></div>
-        <div class="mapbox" style="margin-top:0">
-          <div class="frame"><iframe :src="gmSrc(navSeg)" loading="lazy" referrerpolicy="no-referrer-when-downgrade" :title="navSeg.from + '到' + navSeg.to + ' Google路況'"></iframe></div>
-          <div class="cap"><span>綠＝順暢・橘＝車多・紅＝壅塞</span><span>每 10 分鐘自動刷新</span></div>
-        </div>
-        <p>請與 TDX 車速一起對照：目前 <b style="color:var(--tx)">{{ navSeg.has ? stText[navSeg.st] + '・' + navSeg.spd + ' km/h' : '車少' }}</b>（約 {{ navSeg.kmText }}）。地圖若沒看到紅綠線，請按下方「在 Google 地圖看路況」。</p>
-        <div class="btns">
-          <a :href="navSeg.navUrl" target="_blank" rel="noopener">🧭 開始導航</a>
-          <a :href="gmOpen(navSeg)" target="_blank" rel="noopener">🚦 在 Google 地圖看路況</a>
-        </div>
-      </div>
     </div>
 
     <div v-if="modal" class="modal" @click.self="modal=null">
