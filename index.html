@@ -66,6 +66,10 @@ h2{font-size:1.1rem;margin:28px 0 12px}
 .legal p{margin:0 0 14px}
 .wrap{padding-bottom:150px}
 .chip{white-space:nowrap}
+.navview{position:fixed;inset:0;z-index:9;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.navtop{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;background:var(--bg);border-bottom:1px solid var(--line)}
+.navbody{max-width:640px;margin:0 auto;padding:14px 14px calc(40px + env(safe-area-inset-bottom,0px))}
+.nmap{width:100%;aspect-ratio:4/3;margin-top:12px;border-radius:12px;overflow:hidden;background:#111827}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:14px;z-index:9}
 .box{background:var(--card);border-radius:16px;max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:16px}
 .box img{width:100%;border-radius:10px;background:#111827;aspect-ratio:16/9;object-fit:cover}
@@ -75,7 +79,7 @@ h2{font-size:1.1rem;margin:28px 0 12px}
 <body>
 <div id="root"><div class="wrap">資料載入中…</div></div>
 <script>
-const { createApp, ref, computed, onMounted } = Vue;
+const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
 // 路段（北→南）。km 為台9線里程；nav 為導航用地名
 const SEGS = [
@@ -99,6 +103,8 @@ const stOf = (spd, has) => !has || spd >= 52 ? 'ok' : spd >= 35 ? 'busy' : 'jam'
 const stText = { ok:'暢通', busy:'車多', jam:'壅塞' };
 const PH = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="225"><rect width="100%" height="100%" fill="#111827"/><text x="50%" y="50%" fill="#64748b" font-size="16" text-anchor="middle">影像暫時無法載入</text></svg>');
 const SITE = 'https://qijiaroadrescue.com/';
+// ▼ 要在網頁內顯示 Google 即時路況線，請把 Google Maps JavaScript API 金鑰貼在下面的引號中；留空則「導航」會改為開啟 Google 地圖新分頁
+const GMAPS_KEY = '';
 const TEL = 'tel:0937165037';
 const LINE = 'https://line.me/R/ti/p/%400937_165037';
 
@@ -173,8 +179,28 @@ createApp({
     const imgErr = e => { e.target.onerror = null; e.target.src = PH; };
 
     const gmOpen = s => 'https://www.google.com/maps/@' + s.lat + ',' + s.lng + ',12z/data=!5m1!1e1';
-    onMounted(() => { load(); setInterval(load, 30000); });
-    return { dir, f, q, zone, theme, upd, modal, segs, zones, counts, shown, newsList, stText, SITE, TEL, LINE, gmOpen,
+    const navOpen = ref(false), navErr = ref(false), navUpd = ref('');
+    let gmP = null; const gmObjs = {}, mapEls = {};
+    const nowHM = () => new Date().toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
+    const setEl = k => el => { if (el) mapEls[k] = el; };
+    const loadGoogle = () => gmP || (gmP = new Promise((res, rej) => {
+      if (window.google && window.google.maps) return res();
+      window.__gmReady = res; window.gm_authFailure = () => { navErr.value = true; };
+      const sc = document.createElement('script');
+      sc.src = 'https://maps.googleapis.com/maps/api/js?key=' + GMAPS_KEY + '&callback=__gmReady&loading=async&language=zh-TW&region=TW';
+      sc.async = true; sc.onerror = () => { gmP = null; rej(); }; document.head.appendChild(sc); }));
+    const initMaps = async () => {
+      try { await loadGoogle(); } catch (e) { navErr.value = true; return; }
+      SEGS.forEach(s => { const el = mapEls[s.k]; if (!el || gmObjs[s.k]) return;
+        const map = new google.maps.Map(el, { center:{ lat:s.lat, lng:s.lng }, zoom:12, disableDefaultUI:true, zoomControl:true, gestureHandling:'cooperative', clickableIcons:false });
+        const layer = new google.maps.TrafficLayer(); layer.setMap(map); gmObjs[s.k] = { map, layer }; });
+      navUpd.value = nowHM(); };
+    const refreshMaps = () => { Object.values(gmObjs).forEach(o => { o.layer.setMap(null); o.layer.setMap(o.map); }); navUpd.value = nowHM(); };
+    const openNav = async k => { navErr.value = false; navOpen.value = true; document.body.style.overflow = 'hidden';
+      await nextTick(); await initMaps(); const el = document.getElementById('nc-' + k); if (el) el.scrollIntoView(); };
+    const closeNav = () => { navOpen.value = false; document.body.style.overflow = ''; Object.keys(gmObjs).forEach(k => delete gmObjs[k]); };
+    onMounted(() => { load(); setInterval(load, 30000); setInterval(refreshMaps, 600000); });
+    return { dir, f, q, zone, theme, upd, modal, segs, zones, counts, shown, newsList, stText, SITE, TEL, LINE, gmOpen, GMAPS_KEY, navOpen, navErr, navUpd, openNav, closeNav, setEl,
       setF, pickZone, toggleTheme, openCam, imgErr };
   },
   template: `
@@ -234,7 +260,8 @@ createApp({
         <ul><li v-for="t in s.tips" :key="t">{{ t }}</li></ul>
         <div class="btns">
           <button @click="openCam(s)">📹 即時影像</button>
-          <a :href="gmOpen(s)" target="_blank" rel="noopener">🗺️ 導航</a>
+          <a v-if="!GMAPS_KEY" :href="gmOpen(s)" target="_blank" rel="noopener">🗺️ 導航</a>
+          <button v-else @click="openNav(s.k)">🗺️ 導航</button>
         </div>
       </div>
       <div v-if="!shown.length" class="empty">沒有符合條件的路段</div>
@@ -269,6 +296,27 @@ createApp({
         <svg viewBox="0 0 24 24"><path d="M6.6 10.8a15 15 0 006.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 013 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2z"/></svg>
         0937-165-037
       </a>
+    </div>
+
+    <div v-if="navOpen" class="navview">
+      <div class="navtop">
+        <div><b>🚦 Google 路況地圖</b><div class="sub">綠＝順暢・橘＝車多・紅＝壅塞｜每 10 分鐘自動刷新｜更新 {{ navUpd || '--' }}</div></div>
+        <button class="chip" @click="closeNav">關閉</button>
+      </div>
+      <div class="navbody">
+        <div v-if="navErr" class="news"><h4>地圖載入失敗</h4><p>請確認 Google 金鑰設定，或改用各卡片的「在 Google 地圖開啟」。</p></div>
+        <div v-for="s in segs" :key="s.k" :id="'nc-' + s.k" class="seg" :class="s.st">
+          <div class="row">
+            <div><h3>{{ s.from }} → {{ s.to }}{{ s.name }}</h3><div class="km">約 {{ s.kmText }}</div></div>
+            <span class="badge">{{ stText[s.st] }}・{{ s.has ? s.spd + ' km/h' : '車少' }}</span>
+          </div>
+          <div class="nmap" :ref="setEl(s.k)"></div>
+          <div class="btns" style="margin-top:10px">
+            <a :href="s.navUrl" target="_blank" rel="noopener">🧭 開始導航</a>
+            <a :href="gmOpen(s)" target="_blank" rel="noopener">在 Google 地圖開啟</a>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="modal" class="modal" @click.self="modal=null">
