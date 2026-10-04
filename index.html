@@ -65,6 +65,12 @@ h2{font-size:1.1rem;margin:28px 0 12px}
 .legal h5{margin:0 0 4px;font-size:.85rem;color:var(--tx)}
 .legal p{margin:0 0 14px}
 .wrap{padding-bottom:150px}
+.mapbox{margin-top:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.mapbox .frame{position:relative;width:100%;aspect-ratio:4/3;background:#111827}
+.mapbox iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.mapbox .cap{padding:8px 12px;font-size:.78rem;color:var(--mut);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.mapbox .cap a{color:var(--blue);text-decoration:none}
+.chip{white-space:nowrap}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:14px;z-index:9}
 .box{background:var(--card);border-radius:16px;max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:16px}
 .box img{width:100%;border-radius:10px;background:#111827;aspect-ratio:16/9;object-fit:cover}
@@ -78,15 +84,15 @@ const { createApp, ref, computed, onMounted } = Vue;
 
 // 路段（北→南）。km 為台9線里程；nav 為導航用地名
 const SEGS = [
-  { k:'s1', a:'和平', b:'崇德', na:'花蓮縣秀林鄉和平', nb:'花蓮縣秀林鄉崇德', km:[145,162], name:'（蘇花改）', tips:['單線隧道，大型車易連鎖減速','觀音谷風隧道、中仁隧道北上假日易塞'] },
-  { k:'s2', a:'崇德', b:'新城', na:'花蓮縣秀林鄉崇德', nb:'花蓮縣新城鄉', km:[162,183], name:'（含大清水）', tips:['清水斷崖段注意落石與強風','大清水明隧道曾因邊坡坍方雙向中斷'] },
-  { k:'s3', a:'新城', b:'花蓮市區', na:'花蓮縣新城鄉', nb:'花蓮市區', km:[183,192], name:'', tips:['連假進出市區、太魯閣路口車流多','中橫（台8線）匯入點'] },
-  { k:'s4', a:'吉安', b:'壽豐', na:'花蓮縣吉安鄉', nb:'花蓮縣壽豐鄉', km:[192,206], name:'', tips:['平面道路，路口多注意機車','鯉魚潭、花蓮大學周邊假日車多'] },
-  { k:'s5', a:'壽豐', b:'鳳林', na:'花蓮縣壽豐鄉', nb:'花蓮縣鳳林鎮', km:[206,224], name:'', tips:['縱谷平面道路，路口多注意機車與農機','志學、溪口周邊假日車流較多'] },
-  { k:'s6', a:'鳳林', b:'光復', na:'花蓮縣鳳林鎮', nb:'花蓮縣光復鄉', km:[224,236], name:'', tips:['縱谷直線路段，注意超速取締','颱風期間留意馬太鞍溪一帶水情'] },
-  { k:'s7', a:'光復', b:'瑞穗', na:'花蓮縣光復鄉', nb:'花蓮縣瑞穗鄉', km:[236,255], name:'', tips:['縱谷直線路段，注意車速與跟車距離','富源、瑞穗入口假日溫泉車流增加'] },
-  { k:'s8', a:'瑞穗', b:'玉里', na:'花蓮縣瑞穗鄉', nb:'花蓮縣玉里鎮', km:[255,277], name:'', tips:['瑞穗溫泉區假日車多','北回歸線公園周邊停車進出'] },
-  { k:'s9', a:'玉里', b:'富里', na:'花蓮縣玉里鎮', nb:'花蓮縣富里鄉', km:[277,305], name:'（花東縣界）', tips:['山區彎道，夜間留意野生動物','豪雨時留意縱谷邊坡'] }
+  { k:'s1', lat:24.235, lng:121.71, a:'和平', b:'崇德', na:'花蓮縣秀林鄉和平', nb:'花蓮縣秀林鄉崇德', km:[145,162], name:'（蘇花改）', tips:['單線隧道，大型車易連鎖減速','觀音谷風隧道、中仁隧道北上假日易塞'] },
+  { k:'s2', lat:24.14, lng:121.63, a:'崇德', b:'新城', na:'花蓮縣秀林鄉崇德', nb:'花蓮縣新城鄉', km:[162,183], name:'（含大清水）', tips:['清水斷崖段注意落石與強風','大清水明隧道曾因邊坡坍方雙向中斷'] },
+  { k:'s3', lat:24.03, lng:121.62, a:'新城', b:'花蓮市區', na:'花蓮縣新城鄉', nb:'花蓮市區', km:[183,192], name:'', tips:['連假進出市區、太魯閣路口車流多','中橫（台8線）匯入點'] },
+  { k:'s4', lat:23.93, lng:121.56, a:'吉安', b:'壽豐', na:'花蓮縣吉安鄉', nb:'花蓮縣壽豐鄉', km:[192,206], name:'', tips:['平面道路，路口多注意機車','鯉魚潭、花蓮大學周邊假日車多'] },
+  { k:'s5', lat:23.8, lng:121.48, a:'壽豐', b:'鳳林', na:'花蓮縣壽豐鄉', nb:'花蓮縣鳳林鎮', km:[206,224], name:'', tips:['縱谷平面道路，路口多注意機車與農機','志學、溪口周邊假日車流較多'] },
+  { k:'s6', lat:23.7, lng:121.43, a:'鳳林', b:'光復', na:'花蓮縣鳳林鎮', nb:'花蓮縣光復鄉', km:[224,236], name:'', tips:['縱谷直線路段，注意超速取締','颱風期間留意馬太鞍溪一帶水情'] },
+  { k:'s7', lat:23.58, lng:121.4, a:'光復', b:'瑞穗', na:'花蓮縣光復鄉', nb:'花蓮縣瑞穗鄉', km:[236,255], name:'', tips:['縱谷直線路段，注意車速與跟車距離','富源、瑞穗入口假日溫泉車流增加'] },
+  { k:'s8', lat:23.42, lng:121.34, a:'瑞穗', b:'玉里', na:'花蓮縣瑞穗鄉', nb:'花蓮縣玉里鎮', km:[255,277], name:'', tips:['瑞穗溫泉區假日車多','北回歸線公園周邊停車進出'] },
+  { k:'s9', lat:23.25, lng:121.28, a:'玉里', b:'富里', na:'花蓮縣玉里鎮', nb:'花蓮縣富里鄉', km:[277,305], name:'（花東縣界）', tips:['山區彎道，夜間留意野生動物','豪雨時留意縱谷邊坡'] }
 ];
 // 鄉鎮（北→南）依 docx 順序
 const ZONES = [
@@ -104,6 +110,7 @@ const LINE = 'https://line.me/R/ti/p/%400937_165037';
 createApp({
   setup() {
     const dir = ref('south'), f = ref('all'), q = ref(''), zone = ref(null), theme = ref('dark');
+    const gmT = ref(Date.now()), allMaps = ref(false), openMaps = ref({});
     const vd = ref([]), news = ref([]), cctv = ref([]), upd = ref(''), tick = ref(Date.now()), modal = ref(null);
 
     const get = async n => { const r = await fetch(`./data/${n}.json?t=${Date.now()}`); return r.ok ? r.json() : null; };
@@ -171,8 +178,11 @@ createApp({
     };
     const imgErr = e => { e.target.onerror = null; e.target.src = PH; };
 
-    onMounted(() => { load(); setInterval(load, 30000); });
-    return { dir, f, q, zone, theme, upd, modal, segs, zones, counts, shown, newsList, stText, SITE, TEL, LINE,
+    const gmSrc = s => 'https://maps.google.com/maps?ll=' + s.lat + ',' + s.lng + '&z=12&layer=t&hl=zh-TW&output=embed&_=' + gmT.value;
+    const gmOpen = s => 'https://www.google.com/maps/@' + s.lat + ',' + s.lng + ',12z/data=!5m1!1e1';
+    const toggleMap = k => { openMaps.value = { ...openMaps.value, [k]: !openMaps.value[k] }; };
+    onMounted(() => { load(); setInterval(load, 30000); setInterval(() => { gmT.value = Date.now(); }, 600000); });
+    return { dir, f, q, zone, theme, upd, modal, segs, zones, counts, shown, newsList, stText, SITE, TEL, LINE, gmSrc, gmOpen, allMaps, openMaps, toggleMap,
       setF, pickZone, toggleTheme, openCam, imgErr };
   },
   template: `
@@ -208,6 +218,7 @@ createApp({
       <button class="chip" :class="{on:f==='busy'}" @click="setF('busy')">車多</button>
       <button class="chip" :class="{on:f==='jam'}" @click="setF('jam')">壅塞</button>
       <button class="chip" :class="{on:f==='ctl'}" @click="setF('ctl')">管制</button>
+      <button class="chip" :class="{on:allMaps}" @click="allMaps=!allMaps">🚦 Google 路況</button>
       <input v-model="q" placeholder="搜尋地名 / 隧道…" />
       <button class="chip" @click="toggleTheme" aria-label="切換深淺色">{{ theme==='dark' ? '🌙' : '☀️' }}</button>
     </div>
@@ -231,6 +242,11 @@ createApp({
         <div class="btns">
           <button @click="openCam(s)">📹 即時影像</button>
           <a :href="s.navUrl" target="_blank" rel="noopener">🗺️ 導航</a>
+          <button @click="toggleMap(s.k)">🚦 {{ (allMaps || openMaps[s.k]) ? '收合' : '' }}Google 路況</button>
+        </div>
+        <div v-if="allMaps || openMaps[s.k]" class="mapbox">
+          <div class="frame"><iframe :src="gmSrc(s)" loading="lazy" referrerpolicy="no-referrer-when-downgrade" :title="s.from + '到' + s.to + ' Google路況'"></iframe></div>
+          <div class="cap"><span>綠＝順暢・橘＝車多・紅＝壅塞｜每 10 分鐘自動刷新</span><a :href="gmOpen(s)" target="_blank" rel="noopener">在 Google 地圖開啟</a></div>
         </div>
       </div>
       <div v-if="!shown.length" class="empty">沒有符合條件的路段</div>
@@ -238,7 +254,7 @@ createApp({
 
     <h2>官方即時資訊</h2>
     <div class="links">
-      <a href="https://live.traffictw.com/nearby" target="_blank" rel="noopener"><b>花蓮路況即時影像</b><span>台9線沿線攝影機</span></a>
+      <a href="https://live.traffictw.com/" target="_blank" rel="noopener"><b>花蓮路況即時影像</b><span>台9線沿線攝影機</span></a>
       <a href="https://1968services.tw/" target="_blank" rel="noopener"><b>1968 即時路況</b><span>公路局</span></a>
       <a href="https://www.thb.gov.tw/" target="_blank" rel="noopener"><b>公路局</b><span>封路 / 預警公告</span></a>
       <a href="https://www.cwa.gov.tw/" target="_blank" rel="noopener"><b>中央氣象署</b><span>雨量 / 颱風</span></a>
