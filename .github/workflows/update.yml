@@ -2,13 +2,10 @@ name: Update Traffic Data
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '*/10 * * * *'
 
 permissions:
   contents: write
 
-# 避免兩次執行同時 push 造成衝突
 concurrency:
   group: update-traffic-data
   cancel-in-progress: false
@@ -31,7 +28,6 @@ jobs:
           TDX_SECRET: ${{ secrets.TDX_SECRET }}
         run: node fetch-tdx.mjs
 
-      # 即使上一步失敗也要提交，這樣 data/status.json 能看到失敗原因
       - name: Commit and push changes
         if: always()
         run: |
