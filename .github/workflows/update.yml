@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -33,11 +35,11 @@ jobs:
         run: |
           git config --global user.name "TrafficBot"
           git config --global user.email "bot@traffic.local"
-          git add data/ index.html logo.png
+          git add -A
           if git diff --staged --quiet; then
             echo "no changes"
           else
             git commit -m "update data and static files"
-            git pull --rebase -X theirs
-            git push
+            git pull --rebase origin main || true
+            git push origin main
           fi
