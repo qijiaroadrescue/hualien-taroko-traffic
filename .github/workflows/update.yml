@@ -37,7 +37,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "no changes"
           else
-            git commit -m "update data"
+            git commit -m "update data and static files"
             git pull --rebase -X theirs
             git push
           fi
