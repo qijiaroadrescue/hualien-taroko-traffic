@@ -33,7 +33,7 @@ jobs:
         run: |
           git config --global user.name "TrafficBot"
           git config --global user.email "bot@traffic.local"
-          git add data/
+          git add data/ index.html logo.png
           if git diff --staged --quiet; then
             echo "no changes"
           else
