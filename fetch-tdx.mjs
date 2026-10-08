@@ -8,10 +8,11 @@ const ROUTES = {
   news: "/v2/Road/Traffic/Live/News/Highway",
 };
 
-// 花蓮縣台9線：和平 145K → 縣界橋 304.737K
-const KM_MIN = 145;
-const KM_MAX = 304.737;
-const inRange = (km) => Number.isFinite(km) && km >= KM_MIN && km <= KM_MAX;
+// 台8線：谷關 37K → 太魯閣口/新城 193K（中橫全線）；台14甲：昆陽 18K → 大禹嶺 43K（合歡山）
+const T8_MIN = 37, T8_MAX = 193;
+const T14_MIN = 18, T14_MAX = 43;
+const in8  = (km) => Number.isFinite(km) && km >= T8_MIN  && km <= T8_MAX;
+const in14 = (km) => Number.isFinite(km) && km >= T14_MIN && km <= T14_MAX;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -35,10 +36,11 @@ function trimCctv(json) {
   const KEEP = ["CCTVID", "RoadID", "RoadName", "RoadDirection", "LocationMile", "VideoImageURL", "SurveillanceDescription"];
   const list = (json.CCTVs || [])
     .filter((c) => {
-      // 台9線本身，或 ID 屬於台9線里程樁的花蓮市區道路（康樂路、中正路一段）；排除台9丁/甲/乙/丙等支線
-      const isRoute9 = String(c.RoadID) === "300090";
-      const isCityRoad = /^CCTV-\d+-0090-/.test(String(c.CCTVID || "")) && !/^台9/.test(String(c.RoadName || ""));
-      return (isRoute9 || isCityRoad) && inRange(parseMile(c.LocationMile));
+      const id = String(c.CCTVID || "");
+      const km = parseMile(c.LocationMile);
+      const isT8  = /-0080-/.test(id) && in8(km);
+      const isT14 = (/-014A-/.test(id) || /台14甲/.test(String(c.RoadName || ""))) && in14(km);
+      return isT8 || isT14;
     })
     .map((c) => Object.fromEntries(KEEP.map((k) => [k, c[k]])));
   return { UpdateTime: json.UpdateTime, CCTVs: list };
@@ -46,31 +48,40 @@ function trimCctv(json) {
 
 function trimVd(json) {
   const list = (json.VDLives || []).filter((v) => {
-    const m = String(v.VDID || "").match(/-0090-(\d{3})-/);
-    return m && inRange(parseInt(m[1], 10));
+    const id = String(v.VDID || "");
+    let m = id.match(/-0080-(\d{3})-/);
+    if (m) return in8(parseInt(m[1], 10));
+    m = id.match(/-014A-(\d{3})-/);
+    return !!m && in14(parseInt(m[1], 10));
   });
   return { ...json, VDLives: list };
 }
 
-const TOWNS = ["花蓮", "新城", "吉安", "壽豐", "鳳林", "光復", "瑞穗", "玉里", "富里", "崇德", "秀林"];
+// 中橫相關關鍵字；前端會再把非中橫新聞收進「聯外路況」折疊區
+const KEYS = /台8線|台14甲|中橫|太魯閣|天祥|大禹嶺|合歡山|武嶺|昆陽|關原|梨山|德基|谷關/;
+const TOWNS = ["秀林", "新城", "花蓮縣", "和平", "仁愛"];
 
 function trimNews(json) {
   const list = (json.Newses || []).filter((item) => {
     const title = item.Title || "";
     const text = title + (item.Description || "");
-    // 標題有台9線里程：只依里程判斷（排除宜蘭蘇花改、台東段）
-    const m = title.match(/台9線[^\d]*(\d{2,3})K/);
-    if (m) return inRange(parseInt(m[1], 10));
-    // 沒有里程（例如天氣特報）：依地名判斷
-    return TOWNS.some((t) => text.includes(t)) && !/宜蘭|台北|台東/.test(text);
+    // 台8線標題有里程：只依里程判斷
+    const m8 = title.match(/台8線[^\d]*(\d{1,3})K/);
+    if (m8) return in8(parseInt(m8[1], 10));
+    const m14 = title.match(/台14甲線[^\d]*(\d{1,3})K/);
+    if (m14) return in14(parseInt(m14[1], 10));
+    if (KEYS.test(text)) return true;
+    // 台9／台9丁（蘇花、花東縱谷）與其他縣市不屬於中橫；花蓮縣天氣特報等保留給「聯外路況」
+    if (/台9線|台9丁線|蘇花改/.test(title)) return false;
+    return TOWNS.some((t) => text.includes(t)) && !/宜蘭|台北|台東|台中/.test(text);
   });
   return { ...json, Newses: list };
 }
 
-// allowEmpty：該類資料為空是正常情況（例如沒有管制新聞）
+// allowEmpty：該類資料為空是正常情況
 const TRIMMERS = {
   cctv: { fn: trimCctv, count: (j) => j.CCTVs.length,   allowEmpty: false },
-  vd:   { fn: trimVd,   count: (j) => j.VDLives.length, allowEmpty: false },
+  vd:   { fn: trimVd,   count: (j) => j.VDLives.length, allowEmpty: true  }, // 台8線偵測器可能很少
   news: { fn: trimNews, count: (j) => j.Newses.length,  allowEmpty: true  },
 };
 
@@ -101,14 +112,8 @@ if (!tokenRes.ok) {
         status.results[name] = res.status + " " + (await res.text()).slice(0, 300);
         continue;
       }
-
       let json;
-      try {
-        json = JSON.parse(await res.text());
-      } catch {
-        status.results[name] = "invalid json";
-        continue;
-      }
+      try { json = JSON.parse(await res.text()); } catch { status.results[name] = "invalid json"; continue; }
 
       const trimmer = TRIMMERS[name];
       const trimmed = trimmer.fn(json);
@@ -120,7 +125,6 @@ if (!tokenRes.ok) {
         status.results[name] = "empty after filter (kept previous file)";
         continue;
       }
-
       await writeFile(`data/${name}.json`, JSON.stringify(trimmed));
       status.results[name] = "ok";
     } catch (e) {
@@ -130,5 +134,4 @@ if (!tokenRes.ok) {
 }
 
 await writeFile("data/status.json", JSON.stringify(status, null, 2));
-
 if (Object.values(status.results).some((v) => v !== "ok")) process.exitCode = 1;
