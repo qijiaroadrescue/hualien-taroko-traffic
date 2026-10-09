@@ -1,6 +1,8 @@
 name: Update Traffic Data
 
 on:
+  schedule:
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -14,13 +16,9 @@ jobs:
   fetch:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v5
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -33,14 +31,13 @@ jobs:
       - name: Commit and push changes
         if: always()
         run: |
-          git config --global user.name "TrafficBot"
-          git config --global user.email "bot@traffic.local"
-          git add -A
+          git config user.name "TrafficBot"
+          git config user.email "bot@traffic.local"
+          git add data
           if git diff --staged --quiet; then
             echo "no changes"
           else
-            git commit -m "update data and static files"
-            git fetch origin main
-            git reset --soft origin/main
+            git commit -m "update data"
+            git pull --rebase origin main
             git push origin main
           fi
