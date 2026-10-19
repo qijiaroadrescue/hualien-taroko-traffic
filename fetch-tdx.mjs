@@ -1,20 +1,756 @@
-let tokenRes = null;
-try {
-  tokenRes = await call(TOKEN_URL, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: process.env.TDX_ID,
-      client_secret: process.env.TDX_SECRET,
-    }),
-  });
-} catch (e) {
-  status.results.token = "error " + e;
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>中橫・太魯閣路況快查｜啟佳道路救援</title>
+<meta name="theme-color" content="#17382f">
+<script>
+/* 在畫面繪製前套用使用者上次選的日／夜間模式（沒選過＝自動跟隨裝置） */
+(function(){try{var t=localStorage.getItem("qijia-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t)}catch(e){}})();
+</script>
+<meta name="description" content="台8線中橫公路今日交通管制、通行時段一覽圖、重點即時影像與道路救援一鍵撥號。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ===== 手機優先（mobile-first）：預設為手機，再依螢幕寬度往上加強 ===== */
+:root{
+  --bg:#17382f; --panel:#1d4538; --tile:#295a4b; --tile-hi:#356b5a;
+  --ink:#f2f7f1; --ink-2:#bcd6b8; --line:#4a7a68;
+  --card:#ffffff; --card-ink:#17382f; --card-ink-2:#4a6b57;
+  --accent:#e8c872; --accent-ink:#17382f;
+  --soft:rgba(255,255,255,.08); --chip:rgba(255,255,255,.14);
+  --alert-bg:#3b2a05; --alert-line:#d98a05; --alert-ink:#fde68a;
+  color-scheme:dark;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#e9f1e6; --panel:#f7faf5; --tile:#dfeadb; --tile-hi:#cfe0ca;
+    --ink:#17382f; --ink-2:#4a6b57; --line:#9db9a6; --accent:#8a6410; --accent-ink:#ffffff;
+    --soft:rgba(23,56,47,.07); --chip:rgba(23,56,47,.1);
+    --alert-bg:#fff4d6; --alert-line:#c98a00; --alert-ink:#6b4500;
+    color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#e9f1e6; --panel:#f7faf5; --tile:#dfeadb; --tile-hi:#cfe0ca;
+  --ink:#17382f; --ink-2:#4a6b57; --line:#9db9a6; --accent:#8a6410; --accent-ink:#ffffff;
+    --soft:rgba(23,56,47,.07); --chip:rgba(23,56,47,.1);
+    --alert-bg:#fff4d6; --alert-line:#c98a00; --alert-ink:#6b4500;
+    color-scheme:light;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  font-size:16px;line-height:1.6;overflow-x:hidden}
+a{color:inherit}
+button,a{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{width:100%;max-width:1120px;margin:0 auto;
+  padding:8px max(8px,env(safe-area-inset-right)) calc(88px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left))}
+.sheet{background:var(--panel);border-radius:18px;padding:14px 12px 18px}
+
+/* header */
+.head{display:flex;gap:10px;align-items:center;margin:2px 2px 12px}
+.head svg{flex:none;color:var(--ink-2)}
+.head h1{font-size:clamp(1.2rem,5.4vw,1.6rem);line-height:1.25;margin:0;font-weight:700;letter-spacing:.02em}
+.head p{margin:2px 0 0;color:var(--ink-2);font-size:.88rem}
+
+/* 日／夜間模式切換 */
+.ttl{flex:1;min-width:0}
+.themebar{margin-left:auto;display:flex;align-items:center;gap:6px;flex:none}
+.themebtn{appearance:none;border:1px solid var(--line);background:var(--soft);color:var(--ink);width:56px;height:44px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer}
+.themebtn svg{display:block}
+.themeauto{appearance:none;border:1px solid var(--line);background:transparent;color:var(--ink-2);height:44px;padding:0 12px;border-radius:999px;
+  font:inherit;font-size:.82rem;font-weight:700;cursor:pointer}
+.themeauto[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+@media (max-width:399px){.head>svg{display:none}}
+
+/* 今日道路管制 */
+.notice{margin:0 0 16px}
+.notice-head{display:flex;justify-content:space-between;align-items:baseline;gap:4px 12px;flex-wrap:wrap;margin:0 2px 8px}
+.notice-head h2{margin:0;font-size:1.2rem;font-weight:700}
+.stamp{color:var(--ink-2);font-size:.82rem}
+.refreshbar{display:flex;flex-direction:column;align-items:stretch;gap:6px;margin:0 0 10px}
+.refresh{appearance:none;border:0;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:0 18px;border-radius:14px;
+  background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:700;font-size:1.02rem;cursor:pointer}
+.refresh svg{transition:transform .6s}
+.refresh.spin svg{transform:rotate(360deg)}
+.updated{color:var(--ink-2);font-size:.85rem;text-align:center;min-height:1.4em}
+.daytype{display:inline-block;margin:0 2px 10px;padding:3px 12px;border-radius:999px;font-size:.85rem;font-weight:700;
+  background:var(--accent);color:var(--accent-ink)}
+.alert{background:var(--alert-bg);border:1px solid var(--alert-line);color:var(--alert-ink);border-radius:12px;padding:10px 12px;margin:0 0 10px;font-size:.9rem}
+.zones,.alerts{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr;gap:10px}
+.zone,.alert-i{background:var(--card);color:var(--card-ink);border-radius:14px;padding:12px 12px 12px 14px;border-left:8px solid var(--c)}
+.zone.flash{animation:flash .9s ease}
+@keyframes flash{0%{box-shadow:0 0 0 0 var(--c)}40%{box-shadow:0 0 0 6px var(--c)}100%{box-shadow:0 0 0 0 transparent}}
+.zone .row,.alert-i .row{display:flex;gap:6px 8px;align-items:center;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:.85rem;padding:2px 10px;border-radius:8px;background:var(--c);color:#fff;white-space:nowrap}
+.zone h3{margin:0;font-size:1rem;line-height:1.35}
+.zone h3 span{display:block;color:var(--card-ink-2);font-weight:400;font-size:.85rem}
+.zone .now{margin:6px 0 0;font-size:1.05rem;font-weight:700;line-height:1.4}
+.alert-i .where{font-weight:700}
+.alert-i p{margin:6px 0 4px;font-size:.95rem}
+.alert-i .src{color:var(--card-ink-2);font-size:.78rem}
+.s-open{--c:#1c7447}.s-out{--c:#a15c00}.s-closed{--c:#b3261e}.s-wait{--c:#2a5f8f}.s-check{--c:#5b6470}
+.t-closed{--c:#b3261e}.t-timed{--c:#a15c00}.t-rock{--c:#8a3b12}.t-work{--c:#2a5f8f}
+.sub{margin:14px 2px 8px;font-size:.95rem;font-weight:700}
+.tip{margin:10px 0 0;padding:10px 12px;border-radius:12px;background:var(--soft);font-size:.92rem}
+.tip b{color:var(--accent)}
+details.more{margin:10px 0 0;background:var(--soft);border-radius:12px;padding:6px 12px;font-size:.9rem}
+details.more summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
+details.more p{margin:6px 0}
+.empty{background:var(--card);color:var(--card-ink);border-radius:14px;padding:12px 14px;font-size:.92rem}
+.notice-foot{margin:10px 2px 0;color:var(--ink-2);font-size:.8rem}
+
+/* ===== 通行時段一覽圖：手機＝直式清單；平板＝兩欄；電腦＝橫向長軸柱狀圖 ===== */
+.chart{background:var(--card);color:var(--card-ink);border:2px solid #9cc7ee;border-radius:16px;padding:12px 10px 8px;margin:12px 0 0}
+.chart-head{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:12px}
+.ct{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:.95rem;padding:7px 14px;border-radius:999px;background:#0b4a9e;color:#fff}
+.cl{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;width:100%}
+.cl span{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:500;color:var(--card-ink);line-height:1.3}
+.cl i{flex:none;display:inline-block;width:26px;height:16px;border-radius:4px}
+.chart-scroll{overflow:visible}
+.chart-in{display:grid;grid-template-columns:1fr;gap:16px}
+.crow{display:flex;flex-direction:column;gap:6px}
+.clab{border-radius:10px;background:#f08a1c;color:#fff;padding:8px;display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:2px 8px;line-height:1.3;text-align:center}
+.clab.b{background:#0b4a9e}
+.clab b{font-size:.95rem}.clab small{font-size:.78rem}
+.cbar{position:relative;display:flex;flex-direction:column;gap:3px;min-width:0}
+.cell{display:flex;flex-direction:row;align-items:center;gap:8px;text-align:left;padding:10px 12px;border-radius:8px;color:#fff;line-height:1.3;min-height:44px}
+.cell b{flex:1;font-size:.9rem}
+.cell small{font-size:.85rem}
+.open{background:#1f9d3a}.hold{background:#f9c622;color:#3a2a00}.clear{background:#e0262d}.closed{background:#0b4a9e}.check{background:#5b6470}
+@media (max-width:959px){.cell{flex:none!important}}
+.cell.now{box-shadow:0 0 0 3px #fff,0 0 0 6px #17382f}
+.cell.now::after{content:"現在";flex:none;background:#fff;color:#17382f;font-weight:800;font-size:.72rem;padding:1px 8px;border-radius:999px}
+.cnow{display:none}
+.cnote{color:var(--card-ink-2);font-size:.76rem;margin:8px 2px 4px}
+
+/* ===== 路段示意圖：手機＝直式路線；電腦＝橫向示意圖 ===== */
+.map{background:var(--card);color:var(--card-ink);border-radius:16px;padding:10px 10px 8px;margin:12px 0 0}
+.routev{list-style:none;margin:0;padding:4px 0}
+.routev li{position:relative;padding:9px 0 9px 36px;font-size:.95rem;line-height:1.4;--rc:#f08a1c}
+.routev li.b{--rc:#1e88e5}
+.routev li::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:6px;background:var(--rc)}
+.routev li:first-child::before{top:50%}
+.routev li:last-child::before{bottom:50%}
+.routev .dotm{position:absolute;left:5px;top:50%;margin-top:-10px;width:20px;height:20px;border-radius:50%;background:var(--dc,#e0262d);border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.routev .ring{--dc:#fff;border-color:#1e88e5}
+.routev .green{--dc:#1f9d3a}.routev .blue{--dc:#1e88e5}
+.routev small{display:block;color:var(--card-ink-2);font-size:.8rem}
+.routev .zh span,.routev .endtag{display:inline-block;color:#fff;font-weight:700;font-size:.85rem;border-radius:999px;padding:2px 12px;background:var(--rc)}
+.routev .endtag{border-radius:8px;background:#1f9d3a;font-size:.95rem}
+.map-scroll{display:none}
+.map-scroll svg{display:block;width:100%;height:auto}
+
+/* 重點即時影像 */
+h2.sec{font-size:1.1rem;margin:22px 2px 8px;font-weight:700}
+.hint{color:var(--ink-2);font-size:.82rem;margin:0 2px 4px}
+.grp{margin:16px 2px 8px;font-size:.98rem;font-weight:700}
+.cams{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.cam{background:var(--tile);border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.cam .k{font-size:.98rem;font-weight:700;line-height:1.3}
+.cam .t{font-size:.8rem;color:var(--ink-2);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.dirtag{display:inline-block;padding:0 8px;border-radius:999px;font-size:.75rem;font-weight:700;background:var(--chip)}
+.cam .d{font-size:.85rem;min-height:2.6em;line-height:1.35;overflow-wrap:anywhere}
+.thumb{position:relative;border-radius:10px;overflow:hidden;background:#0d1a15;aspect-ratio:16/9;margin-bottom:2px}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .ts{position:absolute;left:5px;bottom:5px;font-size:.66rem;padding:1px 7px;border-radius:999px;background:rgba(0,0,0,.65);color:#fff}
+.thumb-err{height:100%;display:flex;align-items:center;justify-content:center;color:#9fb8ad;font-size:.8rem;text-align:center;padding:6px}
+.go{display:flex;align-items:center;justify-content:center;text-align:center;min-height:46px;border-radius:12px;margin-top:4px;padding:4px 6px;
+  background:var(--accent);color:var(--accent-ink);font-weight:700;text-decoration:none;font-size:.85rem;line-height:1.3}
+.go.alt{background:transparent;border:2px solid var(--accent);color:var(--ink)}
+
+/* footer */
+.foot{margin-top:24px;padding:16px 2px 4px;border-top:1px solid var(--line);color:var(--ink-2);font-size:.8rem;line-height:1.75}
+.foot p{margin:0 0 10px}
+.foot .tag{color:var(--ink);font-weight:700}
+
+/* 底部快捷列（手機）：回報位置／LINE／電話 */
+.fab{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:1fr 1fr 1.45fr;gap:8px;
+  padding:8px max(10px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left));
+  background:var(--bg);border-top:1px solid var(--line)}
+.fab a,.fab button{appearance:none;border:0;font:inherit;min-height:52px;padding:6px 8px;border-radius:14px;color:#fff;font-weight:700;font-size:.88rem;line-height:1.2;
+  text-decoration:none;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}
+.fab .gps{background:#2563eb}.fab .line{background:#06c755}.fab .call{background:#e04848}
+
+/* 回報位置視窗：手機＝底部抽屜 */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center;padding:0;z-index:9}
+.box{background:var(--card);color:var(--card-ink);border-radius:18px 18px 0 0;width:100%;max-height:92vh;max-height:92dvh;overflow:auto;
+  padding:16px 14px calc(16px + env(safe-area-inset-bottom,0px))}
+.box .top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.box h3{margin:0;font-size:1.05rem}
+.box p{font-size:.85rem;color:var(--card-ink-2);margin:6px 0 10px}
+.box input,.box textarea,.box select{width:100%;padding:12px;border-radius:10px;border:1px solid #b9cdbf;background:#f4f8f3;color:var(--card-ink);font:inherit;font-size:16px;margin:6px 0}
+.box textarea{height:130px}
+.mbtns{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+.mbtns button,.mbtns a{appearance:none;border:1px solid #9db9a6;background:#e4efe4;color:#1d4538;border-radius:10px;padding:10px 14px;font:inherit;font-size:.9rem;text-decoration:none;cursor:pointer;min-height:46px;display:inline-flex;align-items:center}
+.mbtns button:disabled{opacity:.5;cursor:not-allowed}
+
+/* ===== 平板（≥640px） ===== */
+@media (min-width:640px){
+  .wrap{padding-top:16px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+  .sheet{padding:20px 20px 22px;border-radius:22px}
+  .refreshbar{flex-direction:row;align-items:center;gap:12px}
+  .refresh{display:inline-flex;min-height:48px;border-radius:999px}
+  .updated{text-align:left}
+  .zones{grid-template-columns:1fr 1fr}
+  .zone h3 span{display:inline;margin-left:4px}
+  .cl{display:flex;flex-wrap:wrap;gap:6px 16px;width:auto}
+  .chart-head{flex-direction:row;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .chart-in{grid-template-columns:1fr 1fr}
+  .cams{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+  .cam{padding:12px}
+  .cam .k{font-size:1.05rem}
+  .modal{align-items:center;padding:14px}
+  .box{max-width:560px;border-radius:16px;padding:16px}
 }
 
-if (!tokenRes) {
-  // token 逾時：status 已記錄，略過抓取
-} else if (!tokenRes.ok) {
-  status.results.token = tokenRes.status + " " + (await tokenRes.text()).slice(0, 300);
-} else {
+/* ===== 電腦／平板橫放（≥960px）：橫向長軸圖與示意圖 ===== */
+@media (min-width:960px){
+  .chart-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:4px 0 6px}
+  .chart-in{display:block;min-width:880px}
+  .crow{flex-direction:row;align-items:stretch;gap:6px;margin-bottom:8px}
+  .clab{flex:none;width:112px;flex-direction:column;justify-content:center;align-items:center;gap:0;padding:6px 4px}
+  .clab b{font-size:.88rem}.clab small{font-size:.66rem}
+  .cbar{flex:1;flex-direction:row;gap:2px}
+  .cell{flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:7px 2px;min-height:0;overflow:hidden;gap:0}
+  .cell b{flex:none;font-size:.74rem}
+  .cell small{font-size:.66rem}
+  .cell.now{box-shadow:none}
+  .cell.now::after{display:none}
+  .cnow{display:block;position:absolute;top:-3px;bottom:-3px;width:3px;margin-left:-1px;background:#fff;box-shadow:0 0 0 1px #000,0 0 5px #000;z-index:2;border-radius:2px}
+  .routev{display:none}
+  .map-scroll{display:block}
+  .cams{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+}
+
+/* ===== 電腦（≥1024px）：快捷列改為右下角浮動按鈕 ===== */
+@media (min-width:1024px){
+  .wrap{padding-bottom:40px}
+  .sheet{padding:24px 26px 26px}
+  .fab{left:auto;right:16px;bottom:16px;display:flex;flex-direction:column;gap:10px;padding:0;background:none;border:0}
+  .fab a,.fab button{padding:12px 20px;border-radius:999px;font-size:.95rem;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+  .fab a:hover,.fab button:hover,.refresh:hover,.go:hover{filter:brightness(1.08)}
+}
+
+/* 手機橫放：縮小底部列高度 */
+@media (max-height:480px) and (orientation:landscape){
+  .fab a,.fab button{min-height:44px}
+  .wrap{padding-bottom:calc(68px + env(safe-area-inset-bottom,0px))}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="sheet">
+    <header class="head">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M3 19 9.5 7l3.5 6 2-3 6 9z"/></svg>
+      <div class="ttl">
+        <h1>中橫・太魯閣路況快查</h1>
+        <p>啟佳道路救援 | 台8線路況資訊</p>
+      </div>
+      <div class="themebar">
+        <button class="themebtn" id="themeBtn" type="button" aria-label="切換日間／夜間模式"><span id="themeIco" aria-hidden="true"></span></button>
+        <button class="themeauto" id="themeAuto" type="button" aria-pressed="true" aria-label="自動：跟隨裝置的日夜間設定">自動</button>
+      </div>
+    </header>
+
+    <!-- 今日道路管制（最上方） -->
+    <section class="notice" id="notice" aria-labelledby="notice-title">
+      <div class="notice-head">
+        <h2 id="notice-title">今日道路管制</h2>
+        <span class="stamp" id="stamp"></span>
+      </div>
+      <div class="refreshbar">
+        <button class="refresh" id="refresh" type="button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+          一鍵更新目前通行狀態
+        </button>
+        <span class="updated" id="updated" role="status" aria-live="polite"></span>
+      </div>
+      <span class="daytype" id="daytype"></span>
+      <p class="alert" id="expired" hidden>本頁管制時段依公路局 115 年 10 月公告整理，已超過 10/31，請改看公路局最新公告。</p>
+
+      <ul class="zones" id="zones"></ul>
+
+      <!-- 圖一：通行時段一覽圖 -->
+      <div class="chart" id="chart">
+        <div class="chart-head">
+          <span class="ct"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>通行時段一覽圖（長軸柱狀圖）</span>
+          <div class="cl">
+            <span><i class="open"></i>雙向開放通行</span>
+            <span><i class="hold"></i>定時放行（依各路段規定）</span>
+            <span><i class="clear"></i>淨空管制（只出不進）</span>
+            <span><i class="closed"></i>夜間封閉</span>
+          </div>
+        </div>
+        <div class="chart-scroll"><div class="chart-in" id="chartRows"></div></div>
+        <p class="cnote">標示「現在」（或白色直線）為目前時間；區塊寬度為示意，非等比例時間軸。</p>
+      </div>
+
+      <!-- 圖二：路段示意圖 -->
+      <div class="map">
+        <ol class="routev" aria-label="台8線由西至東管制點">
+          <li class="a"><span class="endtag">西</span>　由大禹嶺端往東</li>
+          <li class="a zh"><span>關原至天祥 (114.6k~167.1k)</span></li>
+          <li class="a"><i class="dotm"></i><b>114.6k</b>　關原派出所前<small>關原管制站</small></li>
+          <li class="a"><i class="dotm"></i><b>112.6k</b><small>機動管制點</small></li>
+          <li class="a"><i class="dotm"></i><b>140k</b><small>機動管制點</small></li>
+          <li class="a"><i class="dotm"></i><b>140.280k</b><small>機動管制點</small></li>
+          <li class="a"><i class="dotm blue"></i><b>157.7k</b>　豁然亭</li>
+          <li class="a"><i class="dotm green"></i><b>167.1k</b>　天祥<small>兩段管制的分界</small></li>
+          <li class="b zh"><span>天祥至太魯閣口 (167.7k~184.5k)</span></li>
+          <li class="b"><i class="dotm ring"></i><b>169.5k</b>　綠水水文橋頭</li>
+          <li class="b"><i class="dotm green"></i><b>184.5k</b></li>
+          <li class="b"><i class="dotm"></i><b>砂卡礑隧道東口</b><small>含 184.5k 太魯閣口</small></li>
+          <li class="b"><span class="endtag">東</span>　往花蓮、新城</li>
+        </ol>
+        <div class="map-scroll">
+        <svg viewBox="0 0 1160 190" role="img" aria-label="台8線由西至東的管制點示意圖：關原、112.6k、140k、140.280k、豁然亭157.7k、天祥167.1k、綠水水文橋頭169.5k、184.5k、砂卡礑隧道東口（含184.5k太魯閣口）">
+          <defs>
+            <path id="pin" d="M0,0 C-10,-12 -15,-19 -15,-27 A15,15 0 1 1 15,-27 C15,-19 10,-12 0,0Z"/>
+          </defs>
+          <style>
+            .m-t{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;fill:#17382f}
+            .m-b{font-weight:700}
+          </style>
+          <!-- 西／東 -->
+          <rect x="6" y="108" width="46" height="44" rx="8" fill="#1f9d3a"/>
+          <text class="m-t" x="29" y="138" font-size="24" font-weight="700" text-anchor="middle" style="fill:#fff">西</text>
+          <path d="M70 130H58M66 121 56 130 66 139" fill="none" stroke="#17382f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="1108" y="108" width="46" height="44" rx="8" fill="#1f9d3a"/>
+          <text class="m-t" x="1131" y="138" font-size="24" font-weight="700" text-anchor="middle" style="fill:#fff">東</text>
+          <path d="M1090 130h12M1094 121 1104 130 1094 139" fill="none" stroke="#17382f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- 道路 -->
+          <line x1="72" y1="130" x2="716" y2="130" stroke="#f08a1c" stroke-width="9" stroke-linecap="round"/>
+          <line x1="716" y1="130" x2="1092" y2="130" stroke="#1e88e5" stroke-width="9" stroke-linecap="round"/>
+          <!-- 區間標籤 -->
+          <rect x="270" y="14" width="250" height="34" rx="17" fill="#f08a1c"/>
+          <text class="m-t" x="395" y="37" font-size="15" font-weight="700" text-anchor="middle" style="fill:#fff">關原至天祥 (114.6k~167.1k)</text>
+          <rect x="800" y="14" width="280" height="34" rx="17" fill="#0b4a9e"/>
+          <text class="m-t" x="940" y="37" font-size="15" font-weight="700" text-anchor="middle" style="fill:#fff">天祥至太魯閣口 (167.7k~184.5k)</text>
+          <!-- 114.6k 關原派出所前 -->
+          <use href="#pin" x="92" y="126" style="fill:#e0262d"/><circle cx="92" cy="99" r="5.5" fill="#fff"/>
+          <text class="m-t m-b" x="116" y="86" font-size="14">114.6k</text>
+          <text class="m-t" x="116" y="104" font-size="13">關原派出所前</text>
+          <rect x="66" y="148" width="54" height="26" rx="6" fill="#1e88e5"/>
+          <text class="m-t m-b" x="93" y="166" font-size="14" text-anchor="middle" style="fill:#fff">關原</text>
+          <!-- 紅點管制點 -->
+          <circle cx="220" cy="130" r="8" fill="#e0262d" stroke="#fff" stroke-width="2"/>
+          <text class="m-t m-b" x="220" y="108" font-size="14" text-anchor="middle">112.6k</text>
+          <circle cx="327" cy="130" r="8" fill="#e0262d" stroke="#fff" stroke-width="2"/>
+          <text class="m-t m-b" x="327" y="108" font-size="14" text-anchor="middle">140k</text>
+          <circle cx="422" cy="130" r="8" fill="#e0262d" stroke="#fff" stroke-width="2"/>
+          <text class="m-t m-b" x="422" y="108" font-size="14" text-anchor="middle">140.280k</text>
+          <!-- 157.7k 豁然亭 -->
+          <use href="#pin" x="557" y="126" style="fill:#1e88e5"/><circle cx="557" cy="99" r="5.5" fill="#fff"/>
+          <text class="m-t m-b" x="557" y="62" font-size="14" text-anchor="middle">157.7k</text>
+          <text class="m-t" x="557" y="80" font-size="13" text-anchor="middle">豁然亭</text>
+          <!-- 167.1k 天祥 -->
+          <text class="m-t m-b" x="713" y="52" font-size="14" text-anchor="middle">167.1k</text>
+          <rect x="690" y="58" width="46" height="26" rx="6" fill="#1f9d3a"/>
+          <text class="m-t m-b" x="713" y="76" font-size="14" text-anchor="middle" style="fill:#fff">天祥</text>
+          <use href="#pin" x="713" y="126" style="fill:#1f9d3a"/><circle cx="713" cy="99" r="5.5" fill="#fff"/>
+          <!-- 169.5k 綠水水文橋頭 -->
+          <circle cx="800" cy="130" r="7" fill="#fff" stroke="#1e88e5" stroke-width="3"/>
+          <text class="m-t m-b" x="800" y="108" font-size="14" text-anchor="middle">169.5k</text>
+          <text class="m-t" x="800" y="160" font-size="13" text-anchor="middle">綠水水文橋頭</text>
+          <!-- 184.5k -->
+          <circle cx="918" cy="130" r="8" fill="#1f9d3a" stroke="#fff" stroke-width="2"/>
+          <text class="m-t m-b" x="918" y="108" font-size="14" text-anchor="middle">184.5k</text>
+          <!-- 砂卡礑隧道東口 -->
+          <use href="#pin" x="1060" y="126" style="fill:#e0262d"/><circle cx="1060" cy="99" r="5.5" fill="#fff"/>
+          <text class="m-t m-b" x="1060" y="72" font-size="14" text-anchor="middle">砂卡礑隧道東口</text>
+          <text class="m-t" x="1060" y="88" font-size="12" text-anchor="middle">(含 184.5k 太魯閣口)</text>
+        </svg>
+        </div>
+        <p class="cnote">由西至東的管制點示意圖，間距非實際比例。紅點為機動管制點，天祥為兩段管制的分界。</p>
+      </div>
+
+      <div id="tipbox"></div>
+
+      <h3 class="sub">臨時公告（封閉、落石、施工）</h3>
+      <ul class="alerts" id="alerts"></ul>
+
+      <p class="notice-foot">資料來源：公路局、警廣公告（115年10月份台8線交通管制措施），路況資料另參考公路局 TDX 開放資料。通行狀態依公告時段與台灣時間判讀，並非現場即時感測；以現場標示及公路局最新公告為準，出發前請再次確認。</p>
+    </section>
+
+    <h2 class="sec" id="route">重點即時影像｜台8線</h2>
+    <p class="hint">依里程由西（大禹嶺）至東（太魯閣口）排列，共 13 個攝影點。影像取自公路局 TDX 開放資料，每分鐘自動更新。</p>
+    <p class="hint" id="tdxState" role="status" aria-live="polite">TDX 影像資料載入中…</p>
+    <div id="camgroups"></div>
+
+    <h3 class="grp">轉台14甲（合歡山）</h3>
+    <div class="cams" id="cams14"></div>
+
+    <p class="hint" style="margin-top:12px">尚未對應到 TDX 影像的點位，按鈕會前往台8線影像總覽。</p>
+
+    <footer class="foot">
+      <p><span class="tag">啟佳｜宜花東路況通</span>為民間彙整資訊，不代表官方公告；山區路段請留意落石、起霧與臨時管制。資料來源：公路局 TDX 開放資料。</p>
+      <p><span class="tag">【免責聲明】</span><br>本網站所載之所有資料、商標、標誌、圖像、短片、聲音檔案、連結及其他資料等（以下簡稱「資料」），僅供參考之用。本公司將盡力確保本網站資料的準確性，但對於該等資料的準確性、即時性或完整性，本公司不作任何明示或默示的保證。</p>
+      <p><span class="tag">【著作權聲明】</span><br>本官網之製作權（著作權）歸啟佳道路救援所有，請勿剽竊、轉載或擅自使用。</p>
+      <p>© 2026 啟佳道路救援 版權所有</p>
+    </footer>
+  </div>
+</div>
+
+<!-- 浮動按鈕 -->
+<div class="fab">
+  <button class="gps" id="gpsBtn" type="button">📍 回報位置</button>
+  <a class="line" href="https://line.me/R/ti/p/%400937_165037" target="_blank" rel="noopener">加LINE好友</a>
+  <a class="call" href="tel:0937165037">📞 0937-165-037</a>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="gpsTitle">
+    <div class="top"><h3 id="gpsTitle">📍 山區故障位置回報</h3><div class="mbtns" style="margin:0"><button type="button" id="gpsClose">關閉</button></div></div>
+    <p>填入路邊里程牌公里數（選填），按「取得 GPS」後複製，貼到 LINE 傳給啟佳即可。</p>
+    <label for="gpsRoad" class="sr" style="position:absolute;left:-9999px">道路</label>
+    <select id="gpsRoad"><option>台8線</option><option>台14甲線</option></select>
+    <input id="gpsKm" placeholder="里程牌公里數，例如 114" inputmode="decimal" aria-label="里程牌公里數">
+    <div class="mbtns">
+      <button type="button" id="gpsGet">📡 取得 GPS</button>
+      <button type="button" id="gpsCopy" disabled>📋 複製</button>
+      <a href="https://line.me/R/ti/p/%400937_165037" target="_blank" rel="noopener">傳 LINE</a>
+      <a href="tel:0937165037">📞 撥打</a>
+    </div>
+    <textarea id="gpsTxt" placeholder="定位結果會顯示在這裡" aria-label="定位結果"></textarea>
+    <p id="gpsMsg" role="status" aria-live="polite"></p>
+  </div>
+</div>
+
+<script>
+/* ============ 一、今日道路管制（依 115 年 10 月份管制措施自動判讀） ============ */
+const TZ = "Asia/Taipei";
+const PERIOD_END = "2026-10-31";
+/* 連假期間：取消定時放行，改全天開放（日期含頭尾） */
+const HOLIDAYS = [
+  {from:"2026-10-09", to:"2026-10-11", name:"雙十節連假"},
+  {from:"2026-10-24", to:"2026-10-26", name:"光復節連假"}
+];
+/* 天祥↔太魯閣口 5 次放行（分鐘） */
+const B_WIN = [[390,480],[600,605],[720,780],[900,905],[1020,1080]];
+/* 時段表以「分鐘」表示，涵蓋 0–1440；state: open 開放 / out 只出不進 / closed 封閉 / wait 管制中待放行 / check 依現場公告 */
+function planOf(z, hol){
+  if(z==="A"){
+    return hol
+      ? [[0,390,"closed"],[390,990,"open"],[990,1080,"out"],[1080,1110,"check"],[1110,1440,"closed"]]
+      : [[0,390,"closed"],[390,990,"open"],[990,1110,"out"],[1110,1440,"closed"]];
+  }
+  if(hol) return [[0,390,"closed"],[390,1080,"open"],[1080,1110,"out"],[1110,1440,"closed"]];
+  const p = [[0,390,"closed"]]; let t = 390;
+  B_WIN.forEach(([s,e])=>{ if(s>t) p.push([t,s,"wait"]); p.push([s,e,"open"]); t = e; });
+  p.push([1080,1110,"out"],[1110,1440,"closed"]);
+  return p;
+}
+const ZONES = [
+  {id:"A", name:"關原 ↔ 天祥", range:"台8線 114.6K–167.1K", short:"關原至天祥", kmTxt:"(114.6k~167.1k)"},
+  {id:"B", name:"天祥 ↔ 太魯閣口", range:"台8線 167.7K–184.5K", short:"天祥至太魯閣口", kmTxt:"(167.7k~184.5k)"}
+];
+const STATE = {
+  open:  {label:"開放通行",     cls:"s-open",   ico:"✔"},
+  out:   {label:"只出不進",     cls:"s-out",    ico:"⚠"},
+  closed:{label:"全面封閉",     cls:"s-closed", ico:"✖"},
+  wait:  {label:"管制中・待放行", cls:"s-wait",   ico:"⏱"},
+  check: {label:"請依現場公告",  cls:"s-check",  ico:"ℹ"}
+};
+/* 臨時公告（落石、施工、臨時封閉等）：有消息時依格式新增；空陣列代表尚未登錄 */
+const NOTICES = [
+  // {type:"落石", road:"台8線", range:"約 150K 附近", text:"零星落石，請減速慢行。", at:"2026-10-14 06:30", source:"公路局 TDX 開放資料"}
+];
+const TYPE_META = {
+  "封閉":{cls:"t-closed",ico:"✖",rank:0},
+  "限時放行":{cls:"t-timed",ico:"⏱",rank:1},
+  "落石":{cls:"t-rock",ico:"⚠",rank:2},
+  "施工":{cls:"t-work",ico:"🚧",rank:3}
+};
+
+const hm = m => String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0");
+const hmx = m => m>=1440 ? "翌日 "+hm(m-1440) : hm(m);
+function nowTW(){
+  const p = new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit",
+    hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
+  const g = t => p.find(x=>x.type===t).value;
+  return {date:`${g("year")}-${g("month")}-${g("day")}`, min:(+g("hour"))*60+(+g("minute")), clock:`${g("hour")}:${g("minute")}:${g("second")}`};
+}
+function describe(table, min){
+  const idx = table.findIndex(s=>min>=s[0] && min<s[1]);
+  const seg = table[idx];
+  let detail;
+  if(seg[2]==="open"||seg[2]==="out"||seg[2]==="check"){
+    detail = `至 ${hm(seg[1])}`;
+  } else {
+    const next = table.slice(idx+1).find(s=>s[2]==="open");
+    detail = next ? `下次放行 ${hm(next[0])}–${hm(next[1])}`
+                  : `明日 ${hm(table.find(s=>s[2]==="open")[0])} 起放行`;
+  }
+  return {state:seg[2], detail};
+}
+/* 一覽圖：由同一份時段表產生，並算出白線位置 */
+function chartRow(zone, hol, min){
+  const table = planOf(zone.id, hol);
+  const wide = zone.id==="A" || hol;
+  const W = wide ? {open:5.75,out:1.3,check:.6,wait:1,closed:2.9} : {open:1,wait:1,out:1.1,check:1,closed:2};
+  const cls = {open:"open",wait:"hold",out:"clear",closed:"closed",check:"check"};
+  const cells = [];
+  table.forEach(s=>{
+    if(s[2]==="closed") return;
+    let label;
+    if(s[2]==="open") label = (zone.id==="B" && !hol) ? `放行${s[1]-s[0]}分` : (hol && zone.id==="B" ? "連假雙向開放通行" : "雙向開放通行");
+    else if(s[2]==="wait") label = "施工管制";
+    else if(s[2]==="out") label = "淨空管制";
+    else label = "依現場公告";
+    cells.push([s[0],s[1],cls[s[2]],label,W[s[2]]]);
+  });
+  cells.push([1110,1830,"closed","夜間封閉",W.closed]);
+  const n = min<390 ? min+1440 : min;
+  const total = cells.reduce((a,c)=>a+c[4],0); let acc=0, pos=0;
+  cells.forEach(c=>{ if(n>=c[0] && n<c[1]) pos = acc + (n-c[0])/(c[1]-c[0])*c[4]; acc += c[4]; });
+  const html = cells.map(c=>`<div class="cell ${c[2]}${(n>=c[0] && n<c[1]) ? " now" : ""}" style="flex:${c[4]} 1 0"><b>${hmx(c[0])} - ${hmx(c[1])}</b><small>(${c[3]})</small></div>`).join("");
+  return `<div class="crow"><div class="clab${zone.id==="B"?" b":""}"><b>${zone.short}</b><small>${zone.kmTxt}</small></div>
+    <div class="cbar">${html}<span class="cnow" style="left:${(pos/total*100).toFixed(2)}%"></span></div></div>`;
+}
+function renderNotices(flash){
+  const t = nowTW();
+  const hol = HOLIDAYS.find(h=>t.date>=h.from && t.date<=h.to);
+  document.getElementById("stamp").textContent = `台灣時間 ${t.date.replace(/-/g,"/")} ${hm(t.min)}`;
+  document.getElementById("daytype").textContent = hol ? `${hol.name}｜全天開放（取消定時放行）` : "平日管制（一般日）";
+  document.getElementById("expired").hidden = !(t.date > PERIOD_END);
+
+  const zl = document.getElementById("zones");
+  zl.innerHTML = "";
+  ZONES.forEach(z=>{
+    const d = describe(planOf(z.id, !!hol), t.min);
+    const m = STATE[d.state];
+    const li = document.createElement("li");
+    li.className = "zone " + m.cls + (flash ? " flash" : "");
+    li.innerHTML = `
+      <div class="row"><span class="badge"><span aria-hidden="true">${m.ico}</span>${m.label}</span>
+        <h3>${z.name}<span>｜${z.range}</span></h3></div>
+      <p class="now">目前：${m.label}，${d.detail}</p>`;
+    zl.appendChild(li);
+  });
+
+  document.getElementById("chartRows").innerHTML = ZONES.map(z=>chartRow(z, !!hol, t.min)).join("");
+
+  document.getElementById("tipbox").innerHTML = hol
+    ? `<div class="tip">連假結束隔日即恢復平日定時放行管制。</div>`
+    : `<div class="tip"><b>壓線通過建議</b><br>
+        東行（大禹嶺往太魯閣口）：最晚 17:00 前抵達天祥，才能趕上最後一波 17:00–18:00 放行。<br>
+        西行（太魯閣口往大禹嶺）：最晚 15:00 通過砂卡礑隧道東口管制站，才能在 18:00 夜間封路前通過關原管制站。</div>
+      <details class="more"><summary>太魯閣口單向分流</summary>
+        <p>西行（往天祥／大禹嶺）：砂卡礑隧道 → 西拉岸隧道 → 長春隧道 → 台8線。</p>
+        <p>東行（往花蓮／新城）：台8線 → 長春隧道 → 太魯閣口。</p></details>`;
+
+  const list = document.getElementById("alerts");
+  list.innerHTML = "";
+  if(!NOTICES.length){
+    list.innerHTML = '<li class="empty">目前尚未登錄臨時封閉、落石或施工公告。實際路況請以公路局最新公告為準。</li>';
+  } else {
+    [...NOTICES].sort((a,b)=>(TYPE_META[a.type].rank-TYPE_META[b.type].rank)||b.at.localeCompare(a.at)).forEach(n=>{
+      const m = TYPE_META[n.type];
+      const li = document.createElement("li");
+      li.className = "alert-i " + m.cls;
+      li.innerHTML = `
+        <div class="row"><span class="badge"><span aria-hidden="true">${m.ico}</span>${n.type}</span>
+          <span class="where">${n.road}｜${n.range}</span></div>
+        <p>${n.text}</p>
+        <div class="src">公告時間 ${n.at}｜資料來源：${n.source}</div>`;
+      list.appendChild(li);
+    });
+  }
+  return t.clock;
+}
+renderNotices(false);
+setInterval(()=>renderNotices(false), 30000);
+
+/* 一鍵更新：立即重新判讀此刻是否可通行 */
+const refreshBtn = document.getElementById("refresh");
+refreshBtn.addEventListener("click", ()=>{
+  refreshBtn.classList.add("spin");
+  const clock = renderNotices(true);
+  document.getElementById("updated").textContent = `已更新 ${clock}`;
+  refreshImages();
+  setTimeout(()=>refreshBtn.classList.remove("spin"), 650);
+});
+
+/* ============ 三、重點即時影像（台8線，依里程由西至東） ============
+   k：里程樁；url：該攝影機的影像頁網址，留空則前往台8線影像總覽。 */
+const TW8_CAM = "https://tw.live/provincial-highway/8/";
+const TW14_CAM = "https://168.thb.gov.tw/";
+const CAMS = [
+  {g:"A", k:"110K+500", dir:"西向", town:"秀林鄉", desc:"大禹嶺東向路側(逆)", url:""},
+  {g:"A", k:"113K+280", dir:"東向", town:"秀林鄉", desc:"地滑路段順樁路側", url:""},
+  {g:"A", k:"114K+940", dir:"東向", town:"秀林鄉", desc:"關原加油站西20M", url:""},
+  {g:"A", k:"152K+480", dir:"東向", town:"秀林鄉", desc:"上邊坡落石區間", url:""},
+  {g:"A", k:"156K+640", dir:"東向", town:"秀林鄉", desc:"上邊坡落石區間", url:""},
+  {g:"A", k:"166K+750", dir:"西向", town:"秀林鄉", desc:"天祥西｜往東方向(順)", url:""},
+  {g:"B", k:"182K+210", dir:"西向", town:"秀林鄉", desc:"長春隧道西口(逆)", url:""},
+  {g:"B", k:"182K+650", dir:"西向", town:"秀林鄉", desc:"", url:""},
+  {g:"B", k:"184K+300", dir:"西向", town:"秀林鄉", desc:"太魯閣大橋", url:""},
+  {g:"B", k:"184K+650", dir:"西向", town:"秀林鄉", desc:"", url:""},
+  {g:"B", k:"185K+480", dir:"西向", town:"秀林鄉", desc:"太魯閣口東派出所", url:""},
+  {g:"B", k:"187K+700", dir:"東向", town:"新城鄉", desc:"", url:""},
+  {g:"B", k:"187K+700", dir:"東向", town:"新城鄉", desc:"亞泥旁(順)", url:""}
+];
+const GROUPS = {A:"大禹嶺至天祥", B:"長春隧道至太魯閣口"};
+const CAMS14 = [
+  {name:"小風口", km:""},
+  {name:"合歡山遊客中心", km:"33.0K"},
+  {name:"武嶺", km:"31.5K", note:"台灣公路最高點"}
+];
+const kmOf = k => { const m = k.match(/(\d+)K\+(\d+)/); return +m[1] + (+m[2])/1000; };
+
+const groupsEl = document.getElementById("camgroups");
+
+const camNodes = [];
+["A","B"].forEach(g=>{
+  const h = document.createElement("h3"); h.className = "grp"; h.textContent = GROUPS[g];
+  const grid = document.createElement("div"); grid.className = "cams";
+  groupsEl.appendChild(h); groupsEl.appendChild(grid);
+  CAMS.forEach((c,i)=>{
+    if(c.g!==g) return;
+    c.km = kmOf(c.k);
+    const div = document.createElement("div");
+    div.className = "cam";
+    div.innerHTML = `
+      <div class="thumb" hidden></div>
+      <div class="k">台8線 ${c.k}</div>
+      <div class="t"><span class="dirtag">${c.dir}</span><span>${c.town}</span></div>
+      <div class="d">${c.desc || "&nbsp;"}</div>
+      <a class="go${c.url ? "" : " alt"}" href="${c.url || TW8_CAM}" target="_blank" rel="noopener">${c.url ? "查看即時影像" : "前往台8線影像總覽"}</a>`;
+    grid.appendChild(div); camNodes[i] = div;
+  });
+});
+const g14 = document.getElementById("cams14");
+CAMS14.forEach(c=>{
+  const div = document.createElement("div");
+  div.className = "cam";
+  div.innerHTML = `
+    <div class="k">${c.name}</div>
+    <div class="t"><span class="dirtag">台14甲</span>${c.km ? `<span>${c.km}</span>` : ""}</div>
+    <div class="d">${c.note || "&nbsp;"}</div>
+    <a class="go alt" href="${TW14_CAM}" target="_blank" rel="noopener">前往路況影像總覽</a>`;
+  g14.appendChild(div);
+});
+
+/* ============ 日／夜間模式：一鍵切換，記住選擇；「自動」跟隨裝置設定 ============ */
+const THEME_KEY = "qijia-theme";
+const rootEl = document.documentElement;
+const lightMQ = window.matchMedia("(prefers-color-scheme: light)");
+const themeBtn = document.getElementById("themeBtn");
+const themeAuto = document.getElementById("themeAuto");
+const themeIco = document.getElementById("themeIco");
+const themeMeta = document.querySelector('meta[name="theme-color"]');
+const MOON = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z" fill="#f5b942" stroke="#e08a1e" stroke-width="1.2" stroke-linejoin="round"/></svg>';
+const SUN = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e08a1e" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="#f5b942"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>';
+function currentTheme(){ return rootEl.getAttribute("data-theme") || (lightMQ.matches ? "light" : "dark"); }
+function paintTheme(){
+  const t = currentTheme(), auto = !rootEl.getAttribute("data-theme");
+  themeIco.innerHTML = t === "dark" ? MOON : SUN;
+  const label = t === "dark" ? "目前為夜間模式，點一下切換為日間模式" : "目前為日間模式，點一下切換為夜間模式";
+  themeBtn.setAttribute("aria-label", label); themeBtn.title = label;
+  themeAuto.setAttribute("aria-pressed", auto ? "true" : "false");
+  if(themeMeta) themeMeta.setAttribute("content", t === "dark" ? "#17382f" : "#e9f1e6");
+}
+function setTheme(t){
+  if(t){ rootEl.setAttribute("data-theme", t); try{ localStorage.setItem(THEME_KEY, t); }catch(e){} }
+  else { rootEl.removeAttribute("data-theme"); try{ localStorage.removeItem(THEME_KEY); }catch(e){} }
+  paintTheme();
+}
+themeBtn.addEventListener("click", ()=>setTheme(currentTheme() === "dark" ? "light" : "dark"));
+themeAuto.addEventListener("click", ()=>setTheme(""));
+if(lightMQ.addEventListener) lightMQ.addEventListener("change", paintTheme); else if(lightMQ.addListener) lightMQ.addListener(paintTheme);
+paintTheme();
+
+/* ============ 五、TDX 影像資料（由 GitHub Actions 定期寫入 data/cctv.json） ============
+   金鑰只放在 GitHub Secrets，網頁本身不含任何金鑰。 */
+const tdxState = document.getElementById("tdxState");
+const parseMile = s => { const m = String(s||"").match(/(\d+)\s*K\s*\+?\s*(\d*)/i); return m ? +m[1] + (m[2] ? +m[2]/1000 : 0) : NaN; };
+const strip = s => String(s||"").replace(/[^\u4e00-\u9fffA-Za-z0-9]/g,"");
+const dirOf = s => /東|E/i.test(s) ? "E" : /西|W/i.test(s) ? "W" : "";
+const secure = u => location.protocol==="https:" ? String(u).replace(/^http:/,"https:") : u;
+const bust = u => u + (u.includes("?") ? "&" : "?") + "t=" + Date.now();
+const camImgs = [];
+function refreshImages(){
+  const t = nowTW().clock;
+  camImgs.forEach(o=>{ if(!o.img.isConnected) return; o.img.src = bust(o.base); o.ts.textContent = "影像更新 " + t; });
+}
+function attachTDX(list){
+  const recs = list.map(c=>({c, km:parseMile(c.LocationMile), blob:strip(JSON.stringify(c)), dir:dirOf(String(c.RoadDirection||""))}))
+    .filter(r=>r.c.VideoImageURL && !isNaN(r.km) && !/14A|14甲/.test(String(r.c.CCTVID)+String(r.c.RoadName)));
+  const used = new Set(); let matched = 0;
+  const order = CAMS.map((c,i)=>i).sort((a,b)=>(CAMS[b].desc?1:0)-(CAMS[a].desc?1:0));
+  order.forEach(i=>{
+    const cam = CAMS[i], kw = strip(cam.desc).slice(0,4);
+    let best = null, bs = -1;
+    recs.forEach((r,j)=>{
+      if(used.has(j) || Math.abs(r.km-cam.km) > 0.03) return;
+      const sc = (r.dir===dirOf(cam.dir) ? 2 : 0) + (kw && r.blob.includes(kw) ? 3 : 0);
+      if(sc>bs){ bs = sc; best = j; }
+    });
+    if(best===null) return;
+    used.add(best); matched++;
+    const r = recs[best].c, node = camNodes[i], base = secure(r.VideoImageURL);
+    const box = node.querySelector(".thumb"); box.hidden = false;
+    box.innerHTML = `<a href="${base}" target="_blank" rel="noopener" aria-label="開啟台8線 ${cam.k} 影像"><img alt="台8線 ${cam.k} 即時影像" loading="lazy"></a><span class="ts"></span>`;
+    const img = box.querySelector("img");
+    img.addEventListener("error", ()=>{ box.innerHTML = '<div class="thumb-err">影像暫時無法載入</div>'; });
+    camImgs.push({img, base, ts: box.querySelector(".ts")});
+    const go = node.querySelector(".go");
+    go.href = secure(r.VideoStreamURL || r.VideoImageURL); go.textContent = "查看即時影像"; go.classList.remove("alt");
+  });
+  refreshImages();
+  return matched;
+}
+async function loadTDX(){
+  try{
+    const r = await fetch("./data/cctv.json?t=" + Date.now(), {cache:"no-store"});
+    if(!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const n = attachTDX(Array.isArray(d) ? d : (d.CCTVs || []));
+    tdxState.textContent = `TDX 影像資料：已對應 ${n}／${CAMS.length} 個點位` + (d.UpdateTime ? `（清單更新 ${String(d.UpdateTime).slice(0,16).replace("T"," ")}）` : "");
+  }catch(e){
+    tdxState.textContent = "尚未接上 TDX 影像資料（找不到 data/cctv.json），目前顯示影像總覽連結。";
+  }
+}
+loadTDX();
+setInterval(()=>{ if(!document.hidden) refreshImages(); }, 60000);
+
+/* ============ 四、山區故障位置回報（取得 GPS，複製後貼到 LINE） ============ */
+const modal = document.getElementById("modal");
+const gpsTxt = document.getElementById("gpsTxt");
+const gpsMsg = document.getElementById("gpsMsg");
+const gpsCopy = document.getElementById("gpsCopy");
+function openModal(){ modal.hidden = false; document.getElementById("gpsGet").focus(); }
+function closeModal(){ modal.hidden = true; document.getElementById("gpsBtn").focus(); }
+document.getElementById("gpsBtn").addEventListener("click", openModal);
+document.getElementById("gpsClose").addEventListener("click", closeModal);
+modal.addEventListener("click", e=>{ if(e.target===modal) closeModal(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !modal.hidden) closeModal(); });
+document.getElementById("gpsGet").addEventListener("click", ()=>{
+  if(!navigator.geolocation){ gpsMsg.textContent = "此裝置不支援定位，請手動填寫公里數。"; return; }
+  gpsMsg.textContent = "定位中…";
+  navigator.geolocation.getCurrentPosition(p=>{
+    const la = p.coords.latitude.toFixed(6), ln = p.coords.longitude.toFixed(6);
+    const road = document.getElementById("gpsRoad").value, km = document.getElementById("gpsKm").value.trim();
+    gpsTxt.value = `【啟佳道路救援】車輛故障求援\n位置：${road}${km ? " " + km + "K" : ""}\nGPS：${la},${ln}\n地圖：https://www.google.com/maps?q=${la},${ln}`;
+    gpsCopy.disabled = false;
+    gpsMsg.textContent = "已取得定位，可複製後貼到 LINE 傳給我們。";
+  }, ()=>{ gpsMsg.textContent = "定位失敗，請允許瀏覽器定位權限，或手動填寫公里數。"; }, {enableHighAccuracy:true, timeout:15000});
+});
+gpsCopy.addEventListener("click", async ()=>{
+  try{ await navigator.clipboard.writeText(gpsTxt.value); gpsMsg.textContent = "已複製！"; }
+  catch(e){ gpsTxt.select(); gpsMsg.textContent = "請長按文字框手動複製。"; }
+});
+</script>
+</body>
+</html>
