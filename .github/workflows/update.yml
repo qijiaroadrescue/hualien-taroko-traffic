@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  pages: write
 
 concurrency:
   group: update-traffic-data
@@ -15,6 +16,7 @@ concurrency:
 jobs:
   fetch:
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
 
@@ -29,15 +31,31 @@ jobs:
         run: node fetch-tdx.mjs
 
       - name: Commit and push changes
-        if: always()
+        id: commit
         run: |
           git config user.name "TrafficBot"
           git config user.email "bot@traffic.local"
           git add data
           if git diff --staged --quiet; then
             echo "no changes"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git commit -m "update data"
-            git pull --rebase origin main
-            git push origin main
+            pushed=0
+            for i in 1 2 3; do
+              if git pull --rebase origin main && git push origin main; then
+                pushed=1
+                break
+              fi
+              sleep 5
+            done
+            [ "$pushed" = 1 ] || exit 1
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Trigger Pages build
+        if: steps.commit.outputs.changed == 'true'
+        continue-on-error: true
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds"
+        env:
+          GH_TOKEN: ${{ github.token }}
