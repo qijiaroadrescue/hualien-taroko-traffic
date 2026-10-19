@@ -97,6 +97,12 @@ button,a{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .alert-i .where{font-weight:700}
 .alert-i p{margin:6px 0 4px;font-size:.95rem}
 .alert-i .src{color:var(--card-ink-2);font-size:.78rem}
+.alert-i summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-height:44px}
+.alert-i summary::-webkit-details-marker{display:none}
+.alert-i summary::after{content:"▾";margin-left:auto;color:var(--card-ink-2)}
+.alert-i details[open] summary::after{content:"▴"}
+.alert-i .nt{flex:1 1 180px;font-weight:700;font-size:.92rem;line-height:1.4}
+.sub .stamp{font-weight:400;margin-left:6px}
 .s-open{--c:#1c7447}.s-out{--c:#a15c00}.s-closed{--c:#b3261e}.s-wait{--c:#2a5f8f}.s-check{--c:#5b6470}
 .t-closed{--c:#b3261e}.t-timed{--c:#a15c00}.t-rock{--c:#8a3b12}.t-work{--c:#2a5f8f}
 .sub{margin:14px 2px 8px;font-size:.95rem;font-weight:700}
@@ -377,7 +383,7 @@ h2.sec{font-size:1.1rem;margin:22px 2px 8px;font-weight:700}
 
       <div id="tipbox"></div>
 
-      <h3 class="sub">臨時公告（封閉、落石、施工）</h3>
+      <h3 class="sub">臨時公告與施工通報<span class="stamp" id="newsStamp"></span></h3>
       <ul class="alerts" id="alerts"></ul>
 
       <p class="notice-foot">資料來源：公路局、警廣公告（115年10月份台8線交通管制措施），路況資料另參考公路局 TDX 開放資料。通行狀態依公告時段與台灣時間判讀，並非現場即時感測；以現場標示及公路局最新公告為準，出發前請再次確認。</p>
@@ -466,8 +472,12 @@ const STATE = {
 const NOTICES = [
   // {type:"落石", road:"台8線", range:"約 150K 附近", text:"零星落石，請減速慢行。", at:"2026-10-14 06:30", source:"公路局 TDX 開放資料"}
 ];
+/* 公路局公告（由 data/news.json 載入）；null＝尚未載入 */
+let LIVE_NOTICES = null, NEWS_STATE = "loading";
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const TYPE_META = {
   "封閉":{cls:"t-closed",ico:"✖",rank:0},
+  "管制":{cls:"t-timed",ico:"⏱",rank:1},
   "限時放行":{cls:"t-timed",ico:"⏱",rank:1},
   "落石":{cls:"t-rock",ico:"⚠",rank:2},
   "施工":{cls:"t-work",ico:"🚧",rank:3}
@@ -552,18 +562,22 @@ function renderNotices(flash){
 
   const list = document.getElementById("alerts");
   list.innerHTML = "";
-  if(!NOTICES.length){
-    list.innerHTML = '<li class="empty">目前尚未登錄臨時封閉、落石或施工公告。實際路況請以公路局最新公告為準。</li>';
+  const manual = NOTICES.map(n=>({type:n.type, title:`${n.road}｜${n.range}`, text:n.text, at:n.at, source:n.source}));
+  const items = [...manual, ...(LIVE_NOTICES || [])];
+  if(!items.length){
+    const msg = NEWS_STATE === "loading" ? "公告資料載入中…"
+      : NEWS_STATE === "fail" ? "尚未接上 TDX 公告資料（找不到 data/news.json）。實際路況請以公路局最新公告為準。"
+      : "目前沒有相關的封閉、落石或施工公告。實際路況請以公路局最新公告為準。";
+    list.innerHTML = `<li class="empty">${msg}</li>`;
   } else {
-    [...NOTICES].sort((a,b)=>(TYPE_META[a.type].rank-TYPE_META[b.type].rank)||b.at.localeCompare(a.at)).forEach(n=>{
-      const m = TYPE_META[n.type];
+    const rk = x => (TYPE_META[x] || TYPE_META["管制"]).rank;
+    items.sort((a,b)=>(rk(a.type)-rk(b.type)) || String(b.at).localeCompare(String(a.at))).forEach(n=>{
+      const m = TYPE_META[n.type] || TYPE_META["管制"];
       const li = document.createElement("li");
       li.className = "alert-i " + m.cls;
-      li.innerHTML = `
-        <div class="row"><span class="badge"><span aria-hidden="true">${m.ico}</span>${n.type}</span>
-          <span class="where">${n.road}｜${n.range}</span></div>
-        <p>${n.text}</p>
-        <div class="src">公告時間 ${n.at}｜資料來源：${n.source}</div>`;
+      li.innerHTML = `<details><summary><span class="badge"><span aria-hidden="true">${m.ico}</span>${esc(n.type)}</span><span class="nt">${esc(n.title)}</span></summary>
+        <p>${esc(n.text)}</p>
+        <div class="src">公告時間 ${esc(n.at)}｜資料來源：${esc(n.source)}</div></details>`;
       list.appendChild(li);
     });
   }
@@ -579,6 +593,7 @@ refreshBtn.addEventListener("click", ()=>{
   const clock = renderNotices(true);
   document.getElementById("updated").textContent = `已更新 ${clock}`;
   refreshImages();
+  loadNews();
   setTimeout(()=>refreshBtn.classList.remove("spin"), 650);
 });
 
@@ -603,9 +618,10 @@ const CAMS = [
 ];
 const GROUPS = {A:"大禹嶺至天祥", B:"長春隧道至太魯閣口"};
 const CAMS14 = [
-  {name:"小風口", km:""},
-  {name:"合歡山遊客中心", km:"33.0K"},
-  {name:"武嶺", km:"31.5K", note:"台灣公路最高點"}
+  {name:"小風口", k:"036K+560", desc:"小風口", note:"合歡山管理站"},
+  {name:"合歡山遊客中心", k:"32K+781", desc:"遊客服務中心", note:""},
+  {name:"雪厚標尺", k:"32K+781", desc:"雪厚標尺", note:"積雪深度參考"},
+  {name:"武嶺", k:"31K+500", desc:"武嶺亭", note:"台灣公路最高點"}
 ];
 const kmOf = k => { const m = k.match(/(\d+)K\+(\d+)/); return +m[1] + (+m[2])/1000; };
 
@@ -631,15 +647,18 @@ const camNodes = [];
   });
 });
 const g14 = document.getElementById("cams14");
-CAMS14.forEach(c=>{
+const camNodes14 = [];
+CAMS14.forEach((c,i)=>{
+  c.km = kmOf(c.k);
   const div = document.createElement("div");
   div.className = "cam";
   div.innerHTML = `
+    <div class="thumb" hidden></div>
     <div class="k">${c.name}</div>
-    <div class="t"><span class="dirtag">台14甲</span>${c.km ? `<span>${c.km}</span>` : ""}</div>
+    <div class="t"><span class="dirtag">台14甲</span><span>${c.k}</span></div>
     <div class="d">${c.note || "&nbsp;"}</div>
     <a class="go alt" href="${TW14_CAM}" target="_blank" rel="noopener">前往路況影像總覽</a>`;
-  g14.appendChild(div);
+  g14.appendChild(div); camNodes14[i] = div;
 });
 
 /* ============ 日／夜間模式：一鍵切換，記住選擇；「自動」跟隨裝置設定 ============ */
@@ -671,12 +690,41 @@ themeAuto.addEventListener("click", ()=>setTheme(""));
 if(lightMQ.addEventListener) lightMQ.addEventListener("change", paintTheme); else if(lightMQ.addListener) lightMQ.addListener(paintTheme);
 paintTheme();
 
-/* ============ 五、TDX 影像資料（由 GitHub Actions 定期寫入 data/cctv.json） ============
+/* ============ 五、TDX 資料（由 GitHub Actions 定期寫入 data/cctv.json、data/news.json） ============
    金鑰只放在 GitHub Secrets，網頁本身不含任何金鑰。 */
 const tdxState = document.getElementById("tdxState");
+/*PURE-START*/
 const parseMile = s => { const m = String(s||"").match(/(\d+)\s*K\s*\+?\s*(\d*)/i); return m ? +m[1] + (m[2] ? +m[2]/1000 : 0) : NaN; };
 const strip = s => String(s||"").replace(/[^\u4e00-\u9fffA-Za-z0-9]/g,"");
 const dirOf = s => /東|E/i.test(s) ? "E" : /西|W/i.test(s) ? "W" : "";
+const is14A = c => /14A|14甲/.test(String(c.CCTVID) + String(c.RoadName));
+const toRecs = list => list.map(c=>({c, km:parseMile(c.LocationMile), blob:strip(JSON.stringify(c)), dir:dirOf(String(c.RoadDirection||""))}))
+  .filter(r=>r.c.VideoImageURL && !isNaN(r.km));
+/* 依「里程（±0.03K）＋方向＋名稱關鍵字」把攝影點對應到 TDX 紀錄；有名稱的點位優先挑選 */
+function matchCams(cams, recs){
+  const used = new Set(), out = cams.map(()=>null);
+  const order = cams.map((c,i)=>i).sort((a,b)=>(cams[b].desc?1:0)-(cams[a].desc?1:0));
+  order.forEach(i=>{
+    const cam = cams[i], kw = strip(cam.desc).slice(0,4), cd = dirOf(cam.dir||"");
+    let best = null, bs = -1;
+    recs.forEach((r,j)=>{
+      if(used.has(j) || Math.abs(r.km-cam.km) > 0.03) return;
+      const sc = (cd && r.dir===cd ? 2 : 0) + (kw && r.blob.includes(kw) ? 3 : 0);
+      if(sc>bs){ bs = sc; best = j; }
+    });
+    if(best!==null){ used.add(best); out[i] = best; }
+  });
+  return out;
+}
+/* 依公告標題分類（不用 TDX 的類別代碼，避免代碼定義不同） */
+function classifyNews(t){
+  if(/落石|坍方|土石流/.test(t)) return "落石";
+  if(/工程|施工|工區|搶修|復建|修復/.test(t)) return "施工";
+  if(/放行|班次/.test(t)) return "限時放行";
+  if(/封閉|封路|中斷|禁止通行/.test(t)) return "封閉";
+  return "管制";
+}
+/*PURE-END*/
 const secure = u => location.protocol==="https:" ? String(u).replace(/^http:/,"https:") : u;
 const bust = u => u + (u.includes("?") ? "&" : "?") + "t=" + Date.now();
 const camImgs = [];
@@ -684,32 +732,25 @@ function refreshImages(){
   const t = nowTW().clock;
   camImgs.forEach(o=>{ if(!o.img.isConnected) return; o.img.src = bust(o.base); o.ts.textContent = "影像更新 " + t; });
 }
+function applyThumb(node, rec, name){
+  const base = secure(rec.VideoImageURL);
+  const box = node.querySelector(".thumb"); box.hidden = false;
+  box.innerHTML = `<a href="${esc(base)}" target="_blank" rel="noopener" aria-label="開啟${esc(name)}影像"><img alt="${esc(name)} 即時影像" loading="lazy"></a><span class="ts"></span>`;
+  const img = box.querySelector("img");
+  img.addEventListener("error", ()=>{ box.innerHTML = '<div class="thumb-err">影像暫時無法載入</div>'; });
+  camImgs.push({img, base, ts: box.querySelector(".ts")});
+  const go = node.querySelector(".go");
+  go.href = secure(rec.VideoStreamURL || rec.VideoImageURL); go.textContent = "查看即時影像"; go.classList.remove("alt");
+}
 function attachTDX(list){
-  const recs = list.map(c=>({c, km:parseMile(c.LocationMile), blob:strip(JSON.stringify(c)), dir:dirOf(String(c.RoadDirection||""))}))
-    .filter(r=>r.c.VideoImageURL && !isNaN(r.km) && !/14A|14甲/.test(String(r.c.CCTVID)+String(r.c.RoadName)));
-  const used = new Set(); let matched = 0;
-  const order = CAMS.map((c,i)=>i).sort((a,b)=>(CAMS[b].desc?1:0)-(CAMS[a].desc?1:0));
-  order.forEach(i=>{
-    const cam = CAMS[i], kw = strip(cam.desc).slice(0,4);
-    let best = null, bs = -1;
-    recs.forEach((r,j)=>{
-      if(used.has(j) || Math.abs(r.km-cam.km) > 0.03) return;
-      const sc = (r.dir===dirOf(cam.dir) ? 2 : 0) + (kw && r.blob.includes(kw) ? 3 : 0);
-      if(sc>bs){ bs = sc; best = j; }
-    });
-    if(best===null) return;
-    used.add(best); matched++;
-    const r = recs[best].c, node = camNodes[i], base = secure(r.VideoImageURL);
-    const box = node.querySelector(".thumb"); box.hidden = false;
-    box.innerHTML = `<a href="${base}" target="_blank" rel="noopener" aria-label="開啟台8線 ${cam.k} 影像"><img alt="台8線 ${cam.k} 即時影像" loading="lazy"></a><span class="ts"></span>`;
-    const img = box.querySelector("img");
-    img.addEventListener("error", ()=>{ box.innerHTML = '<div class="thumb-err">影像暫時無法載入</div>'; });
-    camImgs.push({img, base, ts: box.querySelector(".ts")});
-    const go = node.querySelector(".go");
-    go.href = secure(r.VideoStreamURL || r.VideoImageURL); go.textContent = "查看即時影像"; go.classList.remove("alt");
-  });
+  const recs = toRecs(list);
+  const r8 = recs.filter(r=>!is14A(r.c)), r14 = recs.filter(r=>is14A(r.c));
+  const m8 = matchCams(CAMS, r8), m14 = matchCams(CAMS14, r14);
+  let n = 0;
+  CAMS.forEach((cam,i)=>{ if(m8[i]===null) return; n++; applyThumb(camNodes[i], r8[m8[i]].c, `台8線 ${cam.k}`); });
+  CAMS14.forEach((cam,i)=>{ if(m14[i]===null) return; n++; applyThumb(camNodes14[i], r14[m14[i]].c, cam.name); });
   refreshImages();
-  return matched;
+  return n;
 }
 async function loadTDX(){
   try{
@@ -717,13 +758,33 @@ async function loadTDX(){
     if(!r.ok) throw new Error(r.status);
     const d = await r.json();
     const n = attachTDX(Array.isArray(d) ? d : (d.CCTVs || []));
-    tdxState.textContent = `TDX 影像資料：已對應 ${n}／${CAMS.length} 個點位` + (d.UpdateTime ? `（清單更新 ${String(d.UpdateTime).slice(0,16).replace("T"," ")}）` : "");
+    tdxState.textContent = `TDX 影像資料：已對應 ${n}／${CAMS.length + CAMS14.length} 個點位` + (d.UpdateTime ? `（清單更新 ${String(d.UpdateTime).slice(0,16).replace("T"," ")}）` : "");
   }catch(e){
     tdxState.textContent = "尚未接上 TDX 影像資料（找不到 data/cctv.json），目前顯示影像總覽連結。";
   }
 }
+const NEWS_KW = /台8|台14甲|台7甲|中橫|太魯閣|天祥|大禹嶺|合歡山|武嶺|關原|梨山|德基|谷關/;
+async function loadNews(){
+  try{
+    const r = await fetch("./data/news.json?t=" + Date.now(), {cache:"no-store"});
+    if(!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const list = Array.isArray(d) ? d : (d.Newses || []);
+    LIVE_NOTICES = list.filter(n=>NEWS_KW.test((n.Title||"") + (n.Description||""))).map(n=>({
+      type: classifyNews(n.Title||""), title: n.Title||"", text: n.Description||"",
+      at: String(n.PublishTime||"").slice(0,16).replace("T"," "), source: "公路局 TDX 開放資料"}));
+    NEWS_STATE = "ok";
+    document.getElementById("newsStamp").textContent = d.UpdateTime ? `資料更新 ${String(d.UpdateTime).slice(5,16).replace("T"," ")}` : "";
+  }catch(e){
+    LIVE_NOTICES = null; NEWS_STATE = "fail";
+    document.getElementById("newsStamp").textContent = "";
+  }
+  renderNotices(false);
+}
 loadTDX();
+loadNews();
 setInterval(()=>{ if(!document.hidden) refreshImages(); }, 60000);
+setInterval(()=>{ if(!document.hidden) loadNews(); }, 300000);
 
 /* ============ 四、山區故障位置回報（取得 GPS，複製後貼到 LINE） ============ */
 const modal = document.getElementById("modal");
