@@ -161,6 +161,9 @@ h2.sec{font-size:1.1rem;margin:22px 2px 8px;font-weight:700}
 .grp{margin:16px 2px 8px;font-size:.98rem;font-weight:700}
 .cams{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .cam{background:var(--tile);border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:4px;min-width:0}
+a.cam{text-decoration:none;color:inherit;cursor:pointer;transition:transform .15s,filter .15s}
+a.cam:hover{filter:brightness(1.08)}
+a.cam:active{transform:scale(.985)}
 .cam .k{font-size:.98rem;font-weight:700;line-height:1.3}
 .cam .t{font-size:.8rem;color:var(--ink-2);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .dirtag{display:inline-block;padding:0 8px;border-radius:999px;font-size:.75rem;font-weight:700;background:var(--chip)}
@@ -397,7 +400,7 @@ h2.sec{font-size:1.1rem;margin:22px 2px 8px;font-weight:700}
     <h3 class="grp">轉台14甲（合歡山）</h3>
     <div class="cams" id="cams14"></div>
 
-    <p class="hint" style="margin-top:12px">尚未對應到 TDX 影像的點位，按鈕會前往台8線影像總覽。</p>
+    <p class="hint" style="margin-top:12px">點任何一張影像會開新分頁，前往該攝影機的網址；尚未對應到 TDX 的點位則前往台8線影像總覽。</p>
 
     <footer class="foot">
       <p><span class="tag">啟佳｜宜花東路況通</span>為民間彙整資訊，不代表官方公告；山區路段請留意落石、起霧與臨時管制。資料來源：公路局 TDX 開放資料。</p>
@@ -602,19 +605,19 @@ refreshBtn.addEventListener("click", ()=>{
 const TW8_CAM = "https://tw.live/provincial-highway/8/";
 const TW14_CAM = "https://168.thb.gov.tw/";
 const CAMS = [
-  {g:"A", k:"110K+500", dir:"西向", town:"秀林鄉", desc:"大禹嶺東向路側(逆)", url:""},
-  {g:"A", k:"113K+280", dir:"東向", town:"秀林鄉", desc:"地滑路段順樁路側", url:""},
-  {g:"A", k:"114K+940", dir:"東向", town:"秀林鄉", desc:"關原加油站西20M", url:""},
-  {g:"A", k:"152K+480", dir:"東向", town:"秀林鄉", desc:"上邊坡落石區間", url:""},
-  {g:"A", k:"156K+640", dir:"東向", town:"秀林鄉", desc:"上邊坡落石區間", url:""},
-  {g:"A", k:"166K+750", dir:"西向", town:"秀林鄉", desc:"天祥西｜往東方向(順)", url:""},
-  {g:"B", k:"182K+210", dir:"西向", town:"秀林鄉", desc:"長春隧道西口(逆)", url:""},
+  {g:"A", k:"110K+500", dir:"西向", town:"秀林鄉", name:"大禹嶺", desc:"大禹嶺東向路側(逆)", url:""},
+  {g:"A", k:"113K+280", dir:"東向", town:"秀林鄉", name:"地滑路段", desc:"地滑路段順樁路側", url:""},
+  {g:"A", k:"114K+940", dir:"東向", town:"秀林鄉", name:"關原", desc:"關原加油站西20M", url:""},
+  {g:"A", k:"152K+480", dir:"東向", town:"秀林鄉", name:"上邊坡落石區間", desc:"上邊坡落石區間", url:""},
+  {g:"A", k:"156K+640", dir:"東向", town:"秀林鄉", name:"上邊坡落石區間", desc:"上邊坡落石區間", url:""},
+  {g:"A", k:"166K+750", dir:"西向", town:"秀林鄉", name:"天祥西", desc:"天祥西｜往東方向(順)", url:""},
+  {g:"B", k:"182K+210", dir:"西向", town:"秀林鄉", name:"長春隧道", desc:"長春隧道西口(逆)", url:""},
   {g:"B", k:"182K+650", dir:"西向", town:"秀林鄉", desc:"", url:""},
-  {g:"B", k:"184K+300", dir:"西向", town:"秀林鄉", desc:"太魯閣大橋", url:""},
+  {g:"B", k:"184K+300", dir:"西向", town:"秀林鄉", name:"太魯閣大橋", desc:"太魯閣大橋", url:""},
   {g:"B", k:"184K+650", dir:"西向", town:"秀林鄉", desc:"", url:""},
-  {g:"B", k:"185K+480", dir:"西向", town:"秀林鄉", desc:"太魯閣口東派出所", url:""},
+  {g:"B", k:"185K+480", dir:"西向", town:"秀林鄉", name:"太魯閣口", desc:"太魯閣口東派出所", url:""},
   {g:"B", k:"187K+700", dir:"東向", town:"新城鄉", desc:"", url:""},
-  {g:"B", k:"187K+700", dir:"東向", town:"新城鄉", desc:"亞泥旁(順)", url:""}
+  {g:"B", k:"187K+700", dir:"東向", town:"新城鄉", name:"亞泥旁", desc:"亞泥旁(順)", url:""}
 ];
 const GROUPS = {A:"大禹嶺至天祥", B:"長春隧道至太魯閣口"};
 const CAMS14 = [
@@ -635,14 +638,16 @@ const camNodes = [];
   CAMS.forEach((c,i)=>{
     if(c.g!==g) return;
     c.km = kmOf(c.k);
-    const div = document.createElement("div");
+    const div = document.createElement("a");
     div.className = "cam";
+    div.href = c.url || TW8_CAM; div.target = "_blank"; div.rel = "noopener";
+    div.setAttribute("aria-label", `${c.name || "台8線 " + c.k}（開新分頁）`);
     div.innerHTML = `
       <div class="thumb" hidden></div>
-      <div class="k">台8線 ${c.k}</div>
-      <div class="t"><span class="dirtag">${c.dir}</span><span>${c.town}</span></div>
-      <div class="d">${c.desc || "&nbsp;"}</div>
-      <a class="go${c.url ? "" : " alt"}" href="${c.url || TW8_CAM}" target="_blank" rel="noopener">${c.url ? "查看即時影像" : "前往台8線影像總覽"}</a>`;
+      <div class="k">${c.name || "台8線 " + c.k}</div>
+      <div class="t"><span class="dirtag">${c.dir}</span><span>${c.name ? c.k : c.town}</span></div>
+      <div class="d">${c.desc ? c.town + c.desc : "&nbsp;"}</div>
+      <div class="go${c.url ? "" : " alt"}">${c.url ? "查看即時影像 ↗" : "前往台8線影像總覽 ↗"}</div>`;
     grid.appendChild(div); camNodes[i] = div;
   });
 });
@@ -650,14 +655,16 @@ const g14 = document.getElementById("cams14");
 const camNodes14 = [];
 CAMS14.forEach((c,i)=>{
   c.km = kmOf(c.k);
-  const div = document.createElement("div");
+  const div = document.createElement("a");
   div.className = "cam";
+  div.href = TW14_CAM; div.target = "_blank"; div.rel = "noopener";
+  div.setAttribute("aria-label", `${c.name}（開新分頁）`);
   div.innerHTML = `
     <div class="thumb" hidden></div>
     <div class="k">${c.name}</div>
     <div class="t"><span class="dirtag">台14甲</span><span>${c.k}</span></div>
     <div class="d">${c.note || "&nbsp;"}</div>
-    <a class="go alt" href="${TW14_CAM}" target="_blank" rel="noopener">前往路況影像總覽</a>`;
+    <div class="go alt">前往路況影像總覽 ↗</div>`;
   g14.appendChild(div); camNodes14[i] = div;
 });
 
@@ -735,19 +742,23 @@ function refreshImages(){
 function applyThumb(node, rec, name){
   const base = secure(rec.VideoImageURL);
   const box = node.querySelector(".thumb"); box.hidden = false;
-  box.innerHTML = `<a href="${esc(base)}" target="_blank" rel="noopener" aria-label="開啟${esc(name)}影像"><img alt="${esc(name)} 即時影像" loading="lazy"></a><span class="ts"></span>`;
+  box.innerHTML = `<img alt="${esc(name)} 即時影像" loading="lazy"><span class="ts"></span>`;
   const img = box.querySelector("img");
-  img.addEventListener("error", ()=>{ box.innerHTML = '<div class="thumb-err">影像暫時無法載入</div>'; });
+  img.addEventListener("error", ()=>{ box.innerHTML = '<div class="thumb-err">影像暫時無法載入，點卡片開啟原始連結</div>'; });
   camImgs.push({img, base, ts: box.querySelector(".ts")});
-  const go = node.querySelector(".go");
-  go.href = secure(rec.VideoStreamURL || rec.VideoImageURL); go.textContent = "查看即時影像"; go.classList.remove("alt");
+  /* 整張卡片連到這支攝影機自己的網址（TDX 回傳的 VideoStreamURL，沒有就用 VideoImageURL） */
+  node.href = secure(rec.VideoStreamURL || rec.VideoImageURL);
+  node.setAttribute("aria-label", `${name} 即時影像（開新分頁）`);
+  const go = node.querySelector(".go"); go.textContent = "查看即時影像 ↗"; go.classList.remove("alt");
+  const d = node.querySelector(".d");
+  if(d && rec.SurveillanceDescription) d.textContent = rec.SurveillanceDescription;
 }
 function attachTDX(list){
   const recs = toRecs(list);
   const r8 = recs.filter(r=>!is14A(r.c)), r14 = recs.filter(r=>is14A(r.c));
   const m8 = matchCams(CAMS, r8), m14 = matchCams(CAMS14, r14);
   let n = 0;
-  CAMS.forEach((cam,i)=>{ if(m8[i]===null) return; n++; applyThumb(camNodes[i], r8[m8[i]].c, `台8線 ${cam.k}`); });
+  CAMS.forEach((cam,i)=>{ if(m8[i]===null) return; n++; applyThumb(camNodes[i], r8[m8[i]].c, cam.name || `台8線 ${cam.k}`); });
   CAMS14.forEach((cam,i)=>{ if(m14[i]===null) return; n++; applyThumb(camNodes14[i], r14[m14[i]].c, cam.name); });
   refreshImages();
   return n;
