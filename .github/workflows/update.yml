@@ -26,8 +26,8 @@ jobs:
 
       - name: Fetch TDX Data
         env:
-          TDX_CLIENT_ID: ${{ secrets.TDX_CLIENT_ID }}
-          TDX_CLIENT_SECRET: ${{ secrets.TDX_CLIENT_SECRET }}
+          TDX_CLIENT_ID: ${{ secrets.TDX_ID }}
+          TDX_CLIENT_SECRET: ${{ secrets.TDX_SECRET }}
         run: node fetch-tdx.mjs
 
       - name: Commit and push changes
