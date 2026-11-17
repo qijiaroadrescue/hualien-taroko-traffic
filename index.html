@@ -154,27 +154,43 @@
     // 獨立版中橫公路（台8線）Cloudflare Worker 網址
     const REFRESH_API = 'https://taroko-traffic-worker.qq9387036.workers.dev/';
 
-    // ================= 台8線設定區 =================
-    // 台8線里程由西（台中東勢 0K）往東（花蓮太魯閣牌樓約 189K）遞增，花蓮段為大里程端。
-    // 偵測器 VDID 第三段為路線代碼（台8 = 0080）＋ 3 位里程。
+    // ================= 台8線設定區（已對照真實 cctv.json 校正） =================
     const ROUTE_CODE = '0080';
     const ROAD_NAME = '台8線';
-    const SEG_KM = 22;   // 以「太魯閣 189K – 天祥 167K」約 22 公里估算車程
-    // 路段：km 範圍（依實際台8線花蓮段地理里程校正：大禹嶺約 112K、天祥約 167K、布洛灣約 177K、太魯閣約 189K）
+    const SEG_KM = 21;   // 太魯閣口(187.7K) 至 天祥(166.7K) 約 21 公里
+
+    // 路段：依真實 TDX 設備分布（180K~190K 太魯閣口～長春祠、150K~179K 布洛灣～天祥～洛韶、110K~149K 關原～大禹嶺）
     const segBase = [
-      { key: 'taroko',    from: 178, to: 192, limit: 50, nameE: '燕子口 ⇄ 太魯閣（長春祠／錦文橋）', mileE: '台8線 178K-189K',
-        nameW: '太魯閣 ⇄ 燕子口（錦文橋／長春祠）', mileW: '台8線 189K-178K' },
-      { key: 'buluo',     from: 167, to: 177, limit: 50, nameE: '天祥 ⇄ 布洛灣（九曲洞／綠水）', mileE: '台8線 167K-177K',
-        nameW: '布洛灣 ⇄ 天祥（綠水／九曲洞）', mileW: '台8線 177K-167K' },
-      { key: 'tianxiang', from: 112, to: 166, limit: 40, nameE: '大禹嶺 ⇄ 天祥（關原／洛韶／西寶）', mileE: '台8線 112K-166K',
-        nameW: '天祥 ⇄ 大禹嶺（西寶／洛韶／關原）', mileW: '台8線 166K-112K' }
+      { key: 'taroko',    from: 180, to: 192, limit: 50, nameE: '長春祠 ⇄ 太魯閣口（亞泥／太魯閣大橋）', mileE: '台8線 180K-188K',
+        nameW: '太魯閣口 ⇄ 長春祠（太魯閣大橋／長春隧道）', mileW: '台8線 188K-180K' },
+      { key: 'tianxiang', from: 150, to: 179, limit: 40, nameE: '洛韶 ⇄ 天祥（布洛灣／九曲洞）', mileE: '台8線 150K-179K',
+        nameW: '天祥 ⇄ 洛韶（落石區間路段）', mileW: '台8線 179K-150K' },
+      { key: 'dayuling',  from: 110, to: 149, limit: 40, nameE: '大禹嶺 ⇄ 關原（合歡山隧道／地滑路段）', mileE: '台8線 110K-149K',
+        nameW: '關原 ⇄ 大禹嶺（合歡山隧道西側）', mileW: '台8線 149K-110K' }
     ];
-    // 攝影機區段：a=太魯閣–燕子口、b=布洛灣–天祥、c=天祥以西至大禹嶺
-    const camSec = (km) => km >= 178 ? 'a' : km >= 167 ? 'b' : 'c';
-    const SEC_DEF = [['all', '全部'], ['a', '太魯閣–燕子口'], ['b', '布洛灣–天祥'], ['c', '天祥以西']];
-    // 方向：E = 往太魯閣／花蓮市區（下山），W = 往天祥／大禹嶺（上山）
-    const CAM_NAMES = {};   // 可填 { 'CCTV-xx-0080-xxx-001': '燕子口' } 自訂鏡頭名稱
-    // ==============================================
+
+    // 攝影機區段：a=太魯閣–長春祠(180K+)、b=天祥–洛韶(150K~179K)、c=關原–大禹嶺(110K~149K)
+    const camSec = (km) => km >= 180 ? 'a' : km >= 150 ? 'b' : 'c';
+    const SEC_DEF = [['all', '全部'], ['a', '太魯閣–長春祠'], ['b', '天祥–洛韶'], ['c', '關原–大禹嶺']];
+
+    // 自訂清楚地標名稱（針對 TDX 原始名稱僅寫里程的鏡頭）
+    const CAM_NAMES = {
+      'CCTV-44-0080-187-001': '太魯閣口（富世／亞泥前）',
+      'CCTV-44-0080-187-002': '秀林鄉亞泥旁',
+      'CCTV-44-0080-185-001': '太魯閣口東派出所西側',
+      'CCTV-44-0080-184-001': '錦文橋／太魯閣牌樓一帶',
+      'CCTV-44-0080-184-002': '太魯閣大橋',
+      'CCTV-44-0080-182-005': '長春祠路段（182K+650）',
+      'CCTV-44-0080-182-001': '長春隧道西口',
+      'CCTV-44-0080-166-002': '天祥西側（往東方向）',
+      'CCTV-44-0080-156-001': '洛韶東側上邊坡落石區',
+      'CCTV-44-0080-152-003': '洛韶路段上邊坡落石區',
+      'CCTV-44-0080-114-002': '關原加油站西側',
+      'CCTV-44-0080-113-001': '關原地滑路段',
+      'CCTV-25-0080-111-001': '合歡山隧道西側',
+      'CCTV-44-0080-110-001': '大禹嶺東向路側'
+    };
+    // =========================================================================
 
     createApp({
       setup() {
@@ -214,7 +230,160 @@
         const camKm = (c) => { const m = String(c.LocationMile || '').match(/(\d+)\s*K\s*\+?\s*(\d*)/i); return m ? +m[1] + (m[2] ? +m[2] / 1000 : 0) : NaN; };
 
         const loadJson = async (name) => {
-          const res = await fetch(`./data/${name}.json?t=${Date.now()}`, { cache: 'no-store' }); if (!res.ok) throw new Error(name + ' ' + res.status); return res.json(); };  const loadData = async () => { let ok = true; try { const vd = await loadJson('vd'); vdRawData.value = vd.VDLives \vert{}\vert{} []; if (vd.UpdateTime) { const d = new Date(vd.UpdateTime); vdUpdateMs.value = d.getTime(); updateTimeDisplay.value = d.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }); } } catch (e) { ok = false; console.error(e); } try { newsRawData.value = (await loadJson('news')).Newses \vert{}\vert{} []; } catch (e) { console.error(e); } if (!catalogTried) { catalogTried = true; try { const cams = (await loadJson('cctv-catalog')).cameras; camCatalog.value = cams && cams.length ? cams : null; } catch (e) { camCatalog.value = null; } } if (!camCatalog.value) { try { cctvRawData.value = (await loadJson('cctv')).CCTVs \vert{}\vert{} []; } catch (e) { console.error(e); } } try { const s = await loadJson('status'); fetchTimeDisplay.value = new Date(s.updated).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }); } catch (e) {} loadFailed.value = !ok; if (ok) lastRefreshDisplay.value = new Date().toLocaleTimeString('zh-TW', { hour12: false }); };  const loadStatusMs = async () => { try { return Date.parse((await loadJson('status')).updated) \vert{}\vert{} 0; } catch (e) { return 0; } }; const sleep = (ms) => new Promise(r => setTimeout(r, ms)); const markDone = () => { justUpdated.value = true; setTimeout(() => { justUpdated.value = false; }, 3000); }; const reloadAll = async () => { await loadData(); tick.value = Date.now(); camTick.value = Date.now(); };  const onRefresh = async () => { if (refreshing.value) return; refreshing.value = true; justUpdated.value = false; refreshMsg.value = ''; try { const before = await loadStatusMs(); if (before && Date.now() - before < MIN_GAP_MS) { await reloadAll(); refreshMsg.value = '資料剛更新過，已載入最新版本'; markDone(); return; } let res; try { res = await (await fetch(REFRESH_API, { method: 'POST' })).json(); } catch (e) { throw new Error('Worker 連不上'); } if (res.status === 'cooldown') { await reloadAll(); refreshMsg.value = '剛有人更新過，已載入目前最新資料（約 ' + Math.max(1, Math.ceil(res.retryAfter / 60)) + ' 分鐘後可再更新）'; markDone(); return; } if (res.status !== 'started') throw new Error('Worker 回應 ' + res.status + (res.code ? ' ' + res.code : '') + (res.detail ? '：' + res.detail : '')); refreshMsg.value = '已通知更新，約需 1～3 分鐘…'; for (let i = 0; i < POLL_MAX; i++) { await sleep(POLL_MS); if ((await loadStatusMs()) > before) { await reloadAll(); refreshMsg.value = '✅ 已更新'; markDone(); return; } } refreshMsg.value = '更新時間較久，請稍後再按一次'; } catch (e) { console.error(e); refreshMsg.value = '更新失敗（' + e.message + '）'; } finally { refreshing.value = false; } };  const ageMin = computed(() => vdUpdateMs.value ? Math.floor((tick.value - vdUpdateMs.value) / 60000) : null); const isStale = computed(() => !vdUpdateMs.value \vert{}\vert{} ageMin.value > STALE_MIN); const ageText = computed(() => { const m = ageMin.value; if (m === null) return ''; if (m < 60) return m + ' 分鐘前'; if (m < 1440) return Math.floor(m / 60) + ' 小時前'; return Math.floor(m / 1440) + ' 天前'; });  // 各路段車速：只用狀態正常的偵測器；沒資料就是 null，不編數字 const currentSegments = computed(() => { const west = direction.value === 'west'; const re = new RegExp('-' + ROUTE_CODE + '-(\\d{3})-'); const list = west ? [...segBase].reverse() : segBase; return list.map(seg => { const speeds = []; vdRawData.value.forEach(vd => { const m = (vd.VDID \vert{}\vert{} '').match(re); if (!m \vert{}\vert{} vd.Status !== 0) return; const km = +m[1]; if (km < seg.from \vert{}\vert{} km > seg.to) return; (vd.LinkFlows \vert{}\vert{} []).forEach(link => (link.Lanes \vert{}\vert{} []).forEach(lane => { if (lane.Speed > 0 && lane.Speed < 140) speeds.push(lane.Speed); })); }); const speed = speeds.length ? Math.round(speeds.reduce((a, b) => a + b, 0) / speeds.length) : null; return { key: seg.key, limit: seg.limit, speed, name: west ? seg.nameW : seg.nameE, mileage: west ? seg.mileW : seg.mileE }; }); });  const overallAvgSpeed = computed(() => { const valid = currentSegments.value.filter(s => s.speed !== null); return valid.length ? Math.round(valid.reduce((a, b) => a + b.speed, 0) / valid.length) : null; }); const totalEstimatedMinutes = computed(() => overallAvgSpeed.value ? Math.round((SEG_KM / overallAvgSpeed.value) * 60) : null);  // 中橫通報：標題含台8、中橫、太魯閣、天祥、大禹嶺、合歡、燕子口、九曲洞等；新的在前 const NEWS_KEYS = /台8\vert{}中橫\vert{}太魯閣\vert{}天祥\vert{}大禹嶺\vert{}合歡\vert{}燕子口\vert{}九曲洞\vert{}慈恩\vert{}西寶\vert{}洛韶\vert{}關原/; const suhuaNews = computed(() => newsRawData.value.filter(n => NEWS_KEYS.test((n.Title \vert{}\vert{} '') + (n.Description \vert{}\vert{} '')) && !/台9丁\vert{}蘇花/.test(n.Title \vert{}\vert{} '')) .sort((a, b) => new Date(b.PublishTime \vert{}\vert{} 0) - new Date(a.PublishTime \vert{}\vert{} 0))); const filteredNews = computed(() => suhuaNews.value.slice(0, 6)); const closureNews = computed(() => suhuaNews.value.filter(n => /封閉\vert{}管制\vert{}中斷\vert{}坍方\vert{}落石/.test((n.Title \vert{}\vert{} '') + (n.Description \vert{}\vert{} ''))));  const decision = computed(() => { const spd = overallAvgSpeed.value; const closure = closureNews.value.length > 0; const rockNote = '中橫山區落石、坍方風險高，行車請留意路況。'; if (spd === null) { return { tone: closure ? 'warn' : 'none', badge: closure ? '● 有管制／落石通報' : '● 資料不足', title: closure ? '有管制或落石通報・請先確認' : '暫無可靠車速資料', desc: '中橫部分路段偵測器較少，車速可能無資料。請參考下方鏡頭與通報，並查看公路局 1968 官方路況。' }; } const note = closure ? '目前有封閉／管制／落石通報，出發前請先確認下方通報。' : rockNote; if (spd >= 40) { return { tone: closure ? 'warn' : 'ok', badge: closure ? '● 車速正常・有通報' : '● 車速正常', title: closure ? '車速正常・出發前請確認管制' : '中橫車速正常・可出發', desc: '偵測車速正常。' + note }; } else if (spd >= 25) { return { tone: 'warn', badge: '● 車流偏慢', title: '車速偏慢・留意前方狀況', desc: '部分路段車速放緩，可能有遊覽車、施工或管制。' + note }; } return { tone: 'bad', badge: '● 車速偏低', title: '車速偏低・建議確認後再上山', desc: '偵測車速偏低，可能有排隊、單線雙向或管制。' + note }; });  const toneBadge = { ok: 'bg-emerald-500/20 text-emerald-300', warn: 'bg-amber-500/20 text-amber-300', bad: 'bg-rose-500/20 text-rose-300', none: 'bg-slate-500/20 text-slate-300' };  const camPool = computed(() => { if (camCatalog.value) { return camCatalog.value.map(c => ({ id: c.id, road: c.road, dir: normDir(c.dir), mile: c.mile, km: c.km, url: c.url, desc: c.desc \vert{}\vert{} '' })); } return cctvRawData.value .filter(c => c.VideoImageURL && (c.RoadName === ROAD_NAME \vert{}\vert{} String(c.CCTVID \vert{}\vert{} '').includes(`-${ROUTE_CODE}-`)))
+          const res = await fetch(`./data/${name}.json?t=${Date.now()}`, { cache: 'no-store' });
+          if (!res.ok) throw new Error(name + ' ' + res.status);
+          return res.json();
+        };
+
+        const loadData = async () => {
+          let ok = true;
+          try {
+            const vd = await loadJson('vd');
+            vdRawData.value = vd.VDLives || [];
+            if (vd.UpdateTime) {
+              const d = new Date(vd.UpdateTime);
+              vdUpdateMs.value = d.getTime();
+              updateTimeDisplay.value = d.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+            }
+          } catch (e) { ok = false; console.error(e); }
+          try { newsRawData.value = (await loadJson('news')).Newses || []; } catch (e) { console.error(e); }
+          if (!catalogTried) {
+            catalogTried = true;
+            try { const cams = (await loadJson('cctv-catalog')).cameras; camCatalog.value = cams && cams.length ? cams : null; } catch (e) { camCatalog.value = null; }
+          }
+          if (!camCatalog.value) { try { cctvRawData.value = (await loadJson('cctv')).CCTVs || []; } catch (e) { console.error(e); } }
+          try {
+            const s = await loadJson('status');
+            fetchTimeDisplay.value = new Date(s.updated).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+          } catch (e) {}
+          loadFailed.value = !ok;
+          if (ok) lastRefreshDisplay.value = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+        };
+
+        const loadStatusMs = async () => {
+          try { return Date.parse((await loadJson('status')).updated) || 0; } catch (e) { return 0; }
+        };
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+        const markDone = () => { justUpdated.value = true; setTimeout(() => { justUpdated.value = false; }, 3000); };
+        const reloadAll = async () => { await loadData(); tick.value = Date.now(); camTick.value = Date.now(); };
+
+        const onRefresh = async () => {
+          if (refreshing.value) return;
+          refreshing.value = true; justUpdated.value = false; refreshMsg.value = '';
+          try {
+            const before = await loadStatusMs();
+            if (before && Date.now() - before < MIN_GAP_MS) {
+              await reloadAll();
+              refreshMsg.value = '資料剛更新過，已載入最新版本';
+              markDone(); return;
+            }
+            let res;
+            try { res = await (await fetch(REFRESH_API, { method: 'POST' })).json(); }
+            catch (e) { throw new Error('Worker 連不上'); }
+            if (res.status === 'cooldown') {
+              await reloadAll();
+              refreshMsg.value = '剛有人更新過，已載入目前最新資料（約 ' + Math.max(1, Math.ceil(res.retryAfter / 60)) + ' 分鐘後可再更新）';
+              markDone(); return;
+            }
+            if (res.status !== 'started') throw new Error('Worker 回應 ' + res.status + (res.code ? ' ' + res.code : '') + (res.detail ? '：' + res.detail : ''));
+            refreshMsg.value = '已通知更新，約需 1～3 分鐘…';
+            for (let i = 0; i < POLL_MAX; i++) {
+              await sleep(POLL_MS);
+              if ((await loadStatusMs()) > before) {
+                await reloadAll();
+                refreshMsg.value = '✅ 已更新';
+                markDone(); return;
+              }
+            }
+            refreshMsg.value = '更新時間較久，請稍後再按一次';
+          } catch (e) {
+            console.error(e);
+            refreshMsg.value = '更新失敗（' + e.message + '）';
+          } finally { refreshing.value = false; }
+        };
+
+        const ageMin = computed(() => vdUpdateMs.value ? Math.floor((tick.value - vdUpdateMs.value) / 60000) : null);
+        const isStale = computed(() => !vdUpdateMs.value || ageMin.value > STALE_MIN);
+        const ageText = computed(() => {
+          const m = ageMin.value;
+          if (m === null) return '';
+          if (m < 60) return m + ' 分鐘前';
+          if (m < 1440) return Math.floor(m / 60) + ' 小時前';
+          return Math.floor(m / 1440) + ' 天前';
+        });
+
+        // 各路段車速：只用狀態正常的偵測器；沒資料就是 null，不編數字
+        const currentSegments = computed(() => {
+          const west = direction.value === 'west';
+          const re = new RegExp('-' + ROUTE_CODE + '-(\\d{3})-');
+          const list = west ? [...segBase].reverse() : segBase;
+          return list.map(seg => {
+            const speeds = [];
+            vdRawData.value.forEach(vd => {
+              const m = (vd.VDID || '').match(re);
+              if (!m || vd.Status !== 0) return;
+              const km = +m[1];
+              if (km < seg.from || km > seg.to) return;
+              (vd.LinkFlows || []).forEach(link => (link.Lanes || []).forEach(lane => {
+                if (lane.Speed > 0 && lane.Speed < 140) speeds.push(lane.Speed);
+              }));
+            });
+            const speed = speeds.length ? Math.round(speeds.reduce((a, b) => a + b, 0) / speeds.length) : null;
+            return { key: seg.key, limit: seg.limit, speed, name: west ? seg.nameW : seg.nameE, mileage: west ? seg.mileW : seg.mileE };
+          });
+        });
+
+        const overallAvgSpeed = computed(() => {
+          const valid = currentSegments.value.filter(s => s.speed !== null);
+          return valid.length ? Math.round(valid.reduce((a, b) => a + b.speed, 0) / valid.length) : null;
+        });
+        const totalEstimatedMinutes = computed(() =>
+          overallAvgSpeed.value ? Math.round((SEG_KM / overallAvgSpeed.value) * 60) : null);
+
+        // 中橫通報：標題含台8、中橫、太魯閣、天祥、大禹嶺、合歡、燕子口、九曲洞等；新的在前
+        const NEWS_KEYS = /台8|中橫|太魯閣|天祥|大禹嶺|合歡|燕子口|九曲洞|慈恩|西寶|洛韶|關原/;
+        const suhuaNews = computed(() =>
+          newsRawData.value.filter(n => NEWS_KEYS.test((n.Title || '') + (n.Description || '')) && !/台9丁|蘇花/.test(n.Title || ''))
+            .sort((a, b) => new Date(b.PublishTime || 0) - new Date(a.PublishTime || 0)));
+        const filteredNews = computed(() => suhuaNews.value.slice(0, 6));
+        const closureNews = computed(() =>
+          suhuaNews.value.filter(n => /封閉|管制|中斷|坍方|落石/.test((n.Title || '') + (n.Description || ''))));
+
+        const decision = computed(() => {
+          const spd = overallAvgSpeed.value;
+          const closure = closureNews.value.length > 0;
+          const rockNote = '中橫山區落石、坍方風險高，行車請留意路況。';
+          if (spd === null) {
+            return { tone: closure ? 'warn' : 'none', badge: closure ? '● 有管制／落石通報' : '● 資料不足',
+              title: closure ? '有管制或落石通報・請先確認' : '暫無可靠車速資料',
+              desc: '中橫部分路段偵測器較少，車速可能無資料。請參考下方鏡頭與通報，並查看公路局 1968 官方路況。' };
+          }
+          const note = closure ? '目前有封閉／管制／落石通報，出發前請先確認下方通報。' : rockNote;
+          if (spd >= 40) {
+            return { tone: closure ? 'warn' : 'ok', badge: closure ? '● 車速正常・有通報' : '● 車速正常',
+              title: closure ? '車速正常・出發前請確認管制' : '中橫車速正常・可出發',
+              desc: '偵測車速正常。' + note };
+          } else if (spd >= 25) {
+            return { tone: 'warn', badge: '● 車流偏慢',
+              title: '車速偏慢・留意前方狀況', desc: '部分路段車速放緩，可能有遊覽車、施工或管制。' + note };
+          }
+          return { tone: 'bad', badge: '● 車速偏低',
+            title: '車速偏低・建議確認後再上山', desc: '偵測車速偏低，可能有排隊、單線雙向或管制。' + note };
+        });
+
+        const toneBadge = {
+          ok: 'bg-emerald-500/20 text-emerald-300', warn: 'bg-amber-500/20 text-amber-300',
+          bad: 'bg-rose-500/20 text-rose-300', none: 'bg-slate-500/20 text-slate-300'
+        };
+
+        const camPool = computed(() => {
+          if (camCatalog.value) {
+            return camCatalog.value.map(c => ({
+              id: c.id, road: c.road, dir: normDir(c.dir), mile: c.mile, km: c.km, url: c.url, desc: c.desc || ''
+            }));
+          }
+          return cctvRawData.value
+            .filter(c => c.VideoImageURL && (c.RoadName === ROAD_NAME || String(c.CCTVID || '').includes(`-${ROUTE_CODE}-`)))
             .map(c => ({
               id: c.CCTVID,
               road: ROAD_NAME,
@@ -232,9 +401,9 @@
           const list = [];
           camPool.value.forEach(c => {
             if (c.road !== ROAD_NAME) return;
-            // 允許「符合目前方向」或「無方向標示/雙向 (BOTH)」的鏡頭顯示
+            // 僅保留花蓮端／東段（110K 以上）鏡頭，排除台中谷關梨山端
+            if (isNaN(c.km) || c.km < 110) return;
             if (c.dir !== dirCode && c.dir !== 'BOTH') return;
-            if (isNaN(c.km)) return;
             if (activeSection.value !== 'all' && camSec(c.km) !== activeSection.value) return;
             list.push({
               id: c.id,
@@ -338,4 +507,138 @@
                 </div>
                 <div class="w-px h-8 bg-slate-800"></div>
                 <div>
-                  <div class="text-xs text-slate-400">
+                  <div class="text-xs text-slate-400">全線均速（雙向合併）</div>
+                  <div class="text-2xl font-bold font-mono text-white">{{ overallAvgSpeed || '--' }} <span class="text-xs text-slate-400">km/h</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-5 pt-4 border-t border-slate-800">
+              <div class="text-xs font-bold text-amber-400 mb-2">⚠️ 中橫公路管制／落石／施工通報</div>
+              <div v-if="filteredNews.length > 0" class="space-y-2">
+                <div v-for="news in filteredNews" :key="news.NewsID" class="text-xs bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
+                  <div class="text-amber-300 font-semibold mb-1">{{ news.Title }}</div>
+                  <div class="text-slate-300 leading-relaxed">{{ news.Description }}</div>
+                </div>
+              </div>
+              <div v-else class="text-xs text-slate-400 bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                目前資料中沒有台8線通報。中橫常有臨時性管制與落石，出發前請再查看公路局官方公告。
+              </div>
+            </div>
+          </section>
+
+          <section class="mt-8">
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">中橫各路段車速 (VD 偵測，雙向合併)</h3>
+              <span class="text-[11px] text-slate-500">速限 40-50 km/h</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div v-for="seg in currentSegments" :key="seg.key" class="glass-card rounded-xl p-4 flex flex-col justify-between">
+                <div class="flex justify-between items-start mb-2 gap-2">
+                  <div>
+                    <span class="text-[11px] font-mono text-indigo-400">{{ seg.mileage }}</span>
+                    <h4 class="font-bold text-base text-white mt-0.5">{{ seg.name }}</h4>
+                  </div>
+                  <span :class="getStatusBadge(seg.speed)" class="text-[11px] px-2 py-0.5 rounded font-medium shrink-0">{{ getStatusText(seg.speed) }}</span>
+                </div>
+                <div class="flex items-baseline gap-2 mt-2">
+                  <span class="text-3xl font-extrabold font-mono" :class="getSpeedColor(seg.speed)">{{ seg.speed !== null ? seg.speed : '--' }}</span>
+                  <span class="text-xs text-slate-400">km/h (參考速限 {{ seg.limit }})</span>
+                </div>
+                <div class="w-full bg-slate-800/80 h-1.5 rounded-full mt-3 overflow-hidden">
+                  <div class="h-full rounded-full transition-all" :class="getBarColor(seg.speed)"
+                    :style="{ width: seg.speed !== null ? Math.min(100, (seg.speed / seg.limit) * 100) + '%' : '0%' }"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="mt-8">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+              <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                CCTV 快照・台8線・{{ direction === 'east' ? '下山（往太魯閣）' : '上山（往天祥／大禹嶺）' }}
+              </h3>
+              <div class="flex flex-wrap gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs">
+                <button v-for="sc in secList" :key="sc[0]" @click="activeSection = sc[0]" :class="activeSection === sc[0] ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'" class="px-2.5 py-1 rounded-lg transition">{{ sc[1] }}</button>
+              </div>
+            </div>
+
+            <div v-if="cctvList.length === 0" class="text-xs text-slate-400 bg-slate-900/60 p-4 rounded-xl border border-slate-800 text-center">
+              此方向／區段目前沒有可用的鏡頭，請切換方向或區段。
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              <div v-for="cam in cctvList" :key="cam.id" class="glass-card rounded-xl overflow-hidden group">
+                <div class="relative bg-slate-900 aspect-video flex items-center justify-center overflow-hidden">
+                  <img :src="cam.snapshotUrl" :alt="cam.title" loading="lazy"
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    @error="handleImgError($event)" />
+                  <span class="absolute top-2 left-2 bg-black/70 backdrop-blur text-[10px] text-white px-1.5 py-0.5 rounded">{{ cam.mileage }}</span>
+                </div>
+                <div class="p-2.5">
+                  <div class="text-xs font-semibold text-white truncate">{{ cam.title }}</div>
+                  <div class="text-[11px] text-slate-400 mt-0.5 truncate">{{ cam.desc }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="activeSection === 'all' && totalCctvCount > 4" class="mt-4 text-center">
+              <button @click="showAllCCTV = !showAllCCTV" class="px-5 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 transition">
+                {{ showAllCCTV ? '收合部分點位 ▲' : '顯示全部 ' + totalCctvCount + ' 個點位 ▼' }}
+              </button>
+            </div>
+          </section>
+
+          <section class="mt-6 glass-card rounded-2xl p-5 border-amber-500/20 bg-amber-950/20">
+            <div class="flex items-start gap-3">
+              <span class="text-xl">🪨</span>
+              <div>
+                <h4 class="text-sm font-bold text-amber-300">中橫行車提醒</h4>
+                <ul class="text-xs text-slate-300 mt-1 leading-relaxed list-disc pl-4 space-y-1">
+                  <li>山區易有落石、坍方，雨後與地震後風險更高，請避免停車逗留於邊坡下方。</li>
+                  <li>部分路段為單線雙向或實施時段管制，請依現場號誌與人員指揮通行。</li>
+                  <li>山區訊號不穩，出發前請先下載離線地圖並確認油量。</li>
+                  <li>車輛拋錨、爆胎或卡溝需要救援，可使用下方底部按鈕直接聯絡啟佳。</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section class="mt-10">
+            <h3 class="text-base font-bold text-white mb-3">官方即時資訊</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <a class="official-card" href="https://www.1968services.tw/" target="_blank" rel="noopener">
+                <div class="font-bold text-white">1968 即時路況</div>
+                <div class="text-xs text-slate-400 mt-1">公路局</div>
+              </a>
+              <a class="official-card" href="https://www.taroko.gov.tw/" target="_blank" rel="noopener">
+                <div class="font-bold text-white">太魯閣國家公園</div>
+                <div class="text-xs text-slate-400 mt-1">園區公告 / 步道封閉</div>
+              </a>
+              <a class="official-card" href="https://www.cwa.gov.tw/V8/C/" target="_blank" rel="noopener">
+                <div class="font-bold text-white">中央氣象署</div>
+                <div class="text-xs text-slate-400 mt-1">雨量 / 颱風</div>
+              </a>
+            </div>
+          </section>
+
+          <footer class="mt-10 pt-6 border-t border-slate-800 text-xs text-slate-500 leading-relaxed space-y-3">
+            <p>啟佳｜花蓮中橫路況通為民間彙整資訊，不代表官方公告；山區路段請留意落石、起霧與臨時管制。資料來源：公路局 TDX 開放資料。</p>
+            <p><strong class="text-slate-400">【免責聲明】</strong><br>本網站所載之所有資料、商標、標誌、圖像、短片、聲音檔案、連結及其他資料等（以下簡稱「資料」），僅供參考之用。本公司將盡力確保本網站資料的準確性，但對於該等資料的準確性、即時性或完整性，本公司不作任何明示或默示的保證。</p>
+            <p><strong class="text-slate-400">【著作權聲明】</strong><br>本官網之製作權（著作權）歸啟佳道路救援所有，請勿剽竊、轉載或擅自使用。</p>
+            <p class="text-slate-400">© 2026 啟佳道路救援 版權所有</p>
+          </footer>
+
+          <div class="fab-wrap">
+            <div v-if="lastRefreshDisplay" class="fab-time">最後更新：{{ lastRefreshDisplay }}</div>
+            <button class="refresh-btn" @click="onRefresh" :disabled="refreshing" :aria-label="refreshing ? '更新中' : '立即更新路況'">
+              <span :class="refreshing ? 'spin' : ''" aria-hidden="true">{{ refreshing ? '⟳' : (justUpdated ? '✓' : '↻') }}</span>
+              <span>{{ refreshing ? '更新中…' : (justUpdated ? '已更新' : '立即更新') }}</span>
+            </button>
+          </div>
+        </div>
+      `
+    }).mount('#root');
+  </script>
+</body>
+</html>
