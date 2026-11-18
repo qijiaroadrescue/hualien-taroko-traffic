@@ -1,5 +1,5 @@
 {
-  "UpdateTime": "2026-11-18T13:29:04+08:00",
+  "UpdateTime": "2026-11-18T13:59:04+08:00",
   "VDLives": [
     {
       "VDID": "VD-44-0080-110-001",
@@ -45,8 +45,8 @@
             {
               "LaneID": 0,
               "LaneType": 1,
-              "Speed": 0,
-              "Occupancy": 0,
+              "Speed": 33,
+              "Occupancy": 1,
               "Vehicles": [
                 {
                   "VehicleType": "M",
@@ -55,8 +55,8 @@
                 },
                 {
                   "VehicleType": "S",
-                  "Volume": 0,
-                  "Speed": 0
+                  "Volume": 1,
+                  "Speed": 33
                 },
                 {
                   "VehicleType": "L",
@@ -75,7 +75,7 @@
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-18T13:27:00+08:00"
+      "DataCollectTime": "2026-11-18T13:57:00+08:00"
     },
     {
       "VDID": "VD-44-0080-151-001",
@@ -151,7 +151,7 @@
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-18T13:27:00+08:00"
+      "DataCollectTime": "2026-11-18T13:57:00+08:00"
     },
     {
       "VDID": "VD-44-0080-167-001",
@@ -197,8 +197,8 @@
             {
               "LaneID": 0,
               "LaneType": 1,
-              "Speed": 0,
-              "Occupancy": 0,
+              "Speed": 32,
+              "Occupancy": 1,
               "Vehicles": [
                 {
                   "VehicleType": "M",
@@ -207,8 +207,8 @@
                 },
                 {
                   "VehicleType": "S",
-                  "Volume": 0,
-                  "Speed": 0
+                  "Volume": 1,
+                  "Speed": 32
                 },
                 {
                   "VehicleType": "L",
@@ -227,7 +227,7 @@
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-18T13:27:00+08:00"
+      "DataCollectTime": "2026-11-18T13:57:00+08:00"
     }
   ]
 }
