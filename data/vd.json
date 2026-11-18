@@ -1,5 +1,5 @@
 {
-  "UpdateTime": "2026-11-18T10:11:18+08:00",
+  "UpdateTime": "2026-11-18T10:30:18+08:00",
   "VDLives": [
     {
       "VDID": "VD-44-0080-110-001",
@@ -11,8 +11,8 @@
             {
               "LaneID": 0,
               "LaneType": 1,
-              "Speed": 19,
-              "Occupancy": 2,
+              "Speed": 0,
+              "Occupancy": 0,
               "Vehicles": [
                 {
                   "VehicleType": "M",
@@ -21,8 +21,8 @@
                 },
                 {
                   "VehicleType": "S",
-                  "Volume": 2,
-                  "Speed": 19
+                  "Volume": 0,
+                  "Speed": 0
                 },
                 {
                   "VehicleType": "L",
@@ -75,7 +75,7 @@
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-18T10:09:00+08:00"
+      "DataCollectTime": "2026-11-18T10:27:00+08:00"
     },
     {
       "VDID": "VD-44-0080-151-001",
@@ -121,7 +121,7 @@
             {
               "LaneID": 0,
               "LaneType": 1,
-              "Speed": 20,
+              "Speed": 0,
               "Occupancy": 0,
               "Vehicles": [
                 {
@@ -131,8 +131,8 @@
                 },
                 {
                   "VehicleType": "S",
-                  "Volume": 1,
-                  "Speed": 20
+                  "Volume": 0,
+                  "Speed": 0
                 },
                 {
                   "VehicleType": "L",
@@ -145,13 +145,13 @@
                   "Speed": 0
                 }
               ],
-              "ErrorType": "diag203"
+              "ErrorType": "diag0"
             }
           ]
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-18T10:09:00+08:00"
+      "DataCollectTime": "2026-11-18T10:27:00+08:00"
     },
     {
       "VDID": "VD-44-0080-167-001",
@@ -227,7 +227,7 @@
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-18T10:09:00+08:00"
+      "DataCollectTime": "2026-11-18T10:27:00+08:00"
     }
   ]
 }
