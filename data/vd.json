@@ -1,5 +1,5 @@
 {
-  "UpdateTime": "2026-11-19T15:59:04+08:00",
+  "UpdateTime": "2026-11-19T16:25:05+08:00",
   "VDLives": [
     {
       "VDID": "VD-44-0080-110-001",
@@ -75,7 +75,7 @@
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-19T15:57:00+08:00"
+      "DataCollectTime": "2026-11-19T16:22:00+08:00"
     },
     {
       "VDID": "VD-44-0080-151-001",
@@ -151,7 +151,7 @@
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-19T15:57:00+08:00"
+      "DataCollectTime": "2026-11-19T16:22:00+08:00"
     },
     {
       "VDID": "VD-44-0080-167-001",
@@ -159,40 +159,6 @@
       "LinkFlows": [
         {
           "LinkID": "3000800116813U",
-          "Lanes": [
-            {
-              "LaneID": 0,
-              "LaneType": 1,
-              "Speed": 24,
-              "Occupancy": 1,
-              "Vehicles": [
-                {
-                  "VehicleType": "M",
-                  "Volume": 0,
-                  "Speed": 0
-                },
-                {
-                  "VehicleType": "S",
-                  "Volume": 1,
-                  "Speed": 24
-                },
-                {
-                  "VehicleType": "L",
-                  "Volume": 0,
-                  "Speed": 0
-                },
-                {
-                  "VehicleType": "T",
-                  "Volume": 0,
-                  "Speed": 0
-                }
-              ],
-              "ErrorType": "diag0"
-            }
-          ]
-        },
-        {
-          "LinkID": "3000800016813U",
           "Lanes": [
             {
               "LaneID": 0,
@@ -224,10 +190,44 @@
               "ErrorType": "diag0"
             }
           ]
+        },
+        {
+          "LinkID": "3000800016813U",
+          "Lanes": [
+            {
+              "LaneID": 0,
+              "LaneType": 1,
+              "Speed": 27,
+              "Occupancy": 1,
+              "Vehicles": [
+                {
+                  "VehicleType": "M",
+                  "Volume": 0,
+                  "Speed": 0
+                },
+                {
+                  "VehicleType": "S",
+                  "Volume": 1,
+                  "Speed": 27
+                },
+                {
+                  "VehicleType": "L",
+                  "Volume": 0,
+                  "Speed": 0
+                },
+                {
+                  "VehicleType": "T",
+                  "Volume": 0,
+                  "Speed": 0
+                }
+              ],
+              "ErrorType": "diag0"
+            }
+          ]
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-19T15:57:00+08:00"
+      "DataCollectTime": "2026-11-19T16:22:00+08:00"
     }
   ]
 }
