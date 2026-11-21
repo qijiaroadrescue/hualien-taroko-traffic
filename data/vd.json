@@ -1,5 +1,5 @@
 {
-  "UpdateTime": "2026-11-21T14:59:07+08:00",
+  "UpdateTime": "2026-11-21T15:29:06+08:00",
   "VDLives": [
     {
       "VDID": "VD-44-0080-110-001",
@@ -75,7 +75,7 @@
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-21T14:57:00+08:00"
+      "DataCollectTime": "2026-11-21T15:27:00+08:00"
     },
     {
       "VDID": "VD-44-0080-151-001",
@@ -97,13 +97,13 @@
                 },
                 {
                   "VehicleType": "S",
-                  "Volume": 1,
-                  "Speed": 28
+                  "Volume": 0,
+                  "Speed": 0
                 },
                 {
                   "VehicleType": "L",
-                  "Volume": 0,
-                  "Speed": 0
+                  "Volume": 1,
+                  "Speed": 28
                 },
                 {
                   "VehicleType": "T",
@@ -121,7 +121,7 @@
             {
               "LaneID": 0,
               "LaneType": 1,
-              "Speed": 40,
+              "Speed": 0,
               "Occupancy": 0,
               "Vehicles": [
                 {
@@ -131,8 +131,8 @@
                 },
                 {
                   "VehicleType": "S",
-                  "Volume": 1,
-                  "Speed": 40
+                  "Volume": 0,
+                  "Speed": 0
                 },
                 {
                   "VehicleType": "L",
@@ -145,13 +145,13 @@
                   "Speed": 0
                 }
               ],
-              "ErrorType": "diag203"
+              "ErrorType": "diag0"
             }
           ]
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-21T14:57:00+08:00"
+      "DataCollectTime": "2026-11-21T15:27:00+08:00"
     },
     {
       "VDID": "VD-44-0080-167-001",
@@ -197,8 +197,8 @@
             {
               "LaneID": 0,
               "LaneType": 1,
-              "Speed": 37,
-              "Occupancy": 1,
+              "Speed": 0,
+              "Occupancy": 0,
               "Vehicles": [
                 {
                   "VehicleType": "M",
@@ -207,8 +207,8 @@
                 },
                 {
                   "VehicleType": "S",
-                  "Volume": 1,
-                  "Speed": 37
+                  "Volume": 0,
+                  "Speed": 0
                 },
                 {
                   "VehicleType": "L",
@@ -227,7 +227,7 @@
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-21T14:57:00+08:00"
+      "DataCollectTime": "2026-11-21T15:27:00+08:00"
     }
   ]
 }
