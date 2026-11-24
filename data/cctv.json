@@ -18,6 +18,22 @@
       "LocationMile": "109k+400"
     },
     {
+      "CCTVID": "CCTV-25-0080-111-001",
+      "SubAuthorityCode": "THB-2R",
+      "LinkID": "3000800011046M",
+      "VideoStreamURL": "https://cctv-ss07.thb.gov.tw:443/T8-111K+650",
+      "VideoImageURL": "https://cctv-ss07.thb.gov.tw:443/T8-111K+650/snapshot",
+      "LocationType": 1,
+      "PositionLon": 121.307459,
+      "PositionLat": 24.182106,
+      "SurveillanceDescription": "合歡山隧道西側",
+      "RoadID": "300080",
+      "RoadName": "台8線",
+      "RoadClass": 3,
+      "RoadDirection": "E",
+      "LocationMile": "111K+650"
+    },
+    {
       "CCTVID": "CCTV-44-0080-110-001",
       "SubAuthorityCode": "THB-4R",
       "LinkID": "3000800111196U",
@@ -162,6 +178,22 @@
       "LocationMile": "184K+650"
     },
     {
+      "CCTVID": "CCTV-44-0080-184-002",
+      "SubAuthorityCode": "THB-4R",
+      "LinkID": "3000800118644U",
+      "VideoStreamURL": "https://cctv-ss01.thb.gov.tw:443/T8-184K+300",
+      "VideoImageURL": "https://cctv-ss01.thb.gov.tw:443/T8-184K+300/snapshot",
+      "LocationType": 6,
+      "PositionLon": 121.626137,
+      "PositionLat": 24.150616,
+      "SurveillanceDescription": "秀林鄉太魯閣大橋",
+      "RoadID": "300080",
+      "RoadName": "台8線",
+      "RoadClass": 3,
+      "RoadDirection": "W",
+      "LocationMile": "184K+300"
+    },
+    {
       "CCTVID": "CCTV-44-0080-185-001",
       "SubAuthorityCode": "THB-4R",
       "LinkID": "3000800118644U",
@@ -208,38 +240,6 @@
       "RoadClass": 3,
       "RoadDirection": "E",
       "LocationMile": "187K+700"
-    },
-    {
-      "CCTVID": "CCTV-44-0080-184-002",
-      "SubAuthorityCode": "THB-4R",
-      "LinkID": "3000800118644U",
-      "VideoStreamURL": "https://cctv-ss01.thb.gov.tw:443/T8-184K+300",
-      "VideoImageURL": "https://cctv-ss01.thb.gov.tw:443/T8-184K+300/snapshot",
-      "LocationType": 6,
-      "PositionLon": 121.626137,
-      "PositionLat": 24.150616,
-      "SurveillanceDescription": "秀林鄉太魯閣大橋",
-      "RoadID": "300080",
-      "RoadName": "台8線",
-      "RoadClass": 3,
-      "RoadDirection": "W",
-      "LocationMile": "184K+300"
-    },
-    {
-      "CCTVID": "CCTV-25-0080-111-001",
-      "SubAuthorityCode": "THB-2R",
-      "LinkID": "3000800011046M",
-      "VideoStreamURL": "https://cctv-ss07.thb.gov.tw:443/T8-111K+650",
-      "VideoImageURL": "https://cctv-ss07.thb.gov.tw:443/T8-111K+650/snapshot",
-      "LocationType": 1,
-      "PositionLon": 121.307459,
-      "PositionLat": 24.182106,
-      "SurveillanceDescription": "合歡山隧道西側",
-      "RoadID": "300080",
-      "RoadName": "台8線",
-      "RoadClass": 3,
-      "RoadDirection": "E",
-      "LocationMile": "111K+650"
     }
   ]
 }
