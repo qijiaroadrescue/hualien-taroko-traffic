@@ -1,8 +1,9 @@
 {
-  "UpdateTime": "2026-11-27T14:59:02+08:00",
+  "UpdateTime": "2026-11-27T15:29:02+08:00",
   "VDLives": [
     {
       "VDID": "VD-44-0080-110-001",
+      "SubAuthorityCode": "THB-4R",
       "LinkFlows": [
         {
           "LinkID": "3000800111196U",
@@ -33,7 +34,8 @@
                   "Volume": 0,
                   "Speed": 0
                 }
-              ]
+              ],
+              "ErrorType": "diag0"
             }
           ]
         },
@@ -43,8 +45,8 @@
             {
               "LaneID": 0,
               "LaneType": 1,
-              "Speed": 0,
-              "Occupancy": 0,
+              "Speed": 38,
+              "Occupancy": 1,
               "Vehicles": [
                 {
                   "VehicleType": "M",
@@ -53,8 +55,8 @@
                 },
                 {
                   "VehicleType": "S",
-                  "Volume": 0,
-                  "Speed": 0
+                  "Volume": 1,
+                  "Speed": 38
                 },
                 {
                   "VehicleType": "L",
@@ -66,16 +68,18 @@
                   "Volume": 0,
                   "Speed": 0
                 }
-              ]
+              ],
+              "ErrorType": "diag0"
             }
           ]
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-27T14:57:00+08:00"
+      "DataCollectTime": "2026-11-27T15:27:00+08:00"
     },
     {
       "VDID": "VD-44-0080-151-001",
+      "SubAuthorityCode": "THB-4R",
       "LinkFlows": [
         {
           "LinkID": "3000800015288U",
@@ -106,7 +110,8 @@
                   "Volume": 0,
                   "Speed": 0
                 }
-              ]
+              ],
+              "ErrorType": "diag0"
             }
           ]
         },
@@ -116,7 +121,7 @@
             {
               "LaneID": 0,
               "LaneType": 1,
-              "Speed": 38,
+              "Speed": 0,
               "Occupancy": 0,
               "Vehicles": [
                 {
@@ -126,8 +131,8 @@
                 },
                 {
                   "VehicleType": "S",
-                  "Volume": 1,
-                  "Speed": 38
+                  "Volume": 0,
+                  "Speed": 0
                 },
                 {
                   "VehicleType": "L",
@@ -139,16 +144,18 @@
                   "Volume": 0,
                   "Speed": 0
                 }
-              ]
+              ],
+              "ErrorType": "diag0"
             }
           ]
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-27T14:57:00+08:00"
+      "DataCollectTime": "2026-11-27T15:27:00+08:00"
     },
     {
       "VDID": "VD-44-0080-167-001",
+      "SubAuthorityCode": "THB-4R",
       "LinkFlows": [
         {
           "LinkID": "3000800116813U",
@@ -179,7 +186,8 @@
                   "Volume": 0,
                   "Speed": 0
                 }
-              ]
+              ],
+              "ErrorType": "diag0"
             }
           ]
         },
@@ -212,13 +220,14 @@
                   "Volume": 0,
                   "Speed": 0
                 }
-              ]
+              ],
+              "ErrorType": "diag0"
             }
           ]
         }
       ],
       "Status": 0,
-      "DataCollectTime": "2026-11-27T14:57:00+08:00"
+      "DataCollectTime": "2026-11-27T15:27:00+08:00"
     }
   ]
 }
